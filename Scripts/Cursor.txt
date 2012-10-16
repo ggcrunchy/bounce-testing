@@ -1,0 +1,53 @@
+----------------
+-- Cursor table
+----------------
+local _Cursor = {};
+
+---------------------
+-- LoadCursor
+-- Loads a cursor
+-- key: Cursor key
+-- data: Cursor data
+---------------------
+function LoadCursor (key, data)
+	if type(data) ~= "userdata" then
+		-- Reset the bit counter and datum/mask bytes on each line of the image.
+		local db, mb = {}, {};
+		for _, row in ipairs(data) do
+			local bits, data, mask = 0, 0, 0;
+			
+			-- Scan the row. "X" characters are marked as white; "." are marked as black.
+			for bit in row:gmatch(".") do
+				data, mask = data + data, mask + mask;
+				if bit == "X" or bit == "." then
+					if bit == "." then
+						data = Ops.OR(data, 1);
+					end
+					mask = Ops.OR(mask, 1);
+				end
+				
+				-- Increment the bit counter. If a byte is full, append it to the data/mask
+				-- lists. Reset the bit counter and datum/mask bytes.
+				bits = bits + 1;
+				if bits == 8 then
+					table.insert(db, data);
+					table.insert(mb, mask);
+					bits, data, mask = 0, 0, 0;
+				end
+			end
+		end
+		
+		-- Build the cursor from the datum/mask lists.
+		data = SDL.CreateCursor(Misc.BufferU8(db), Misc.BufferU8(mb), 24, #data, 0, 0);
+	end
+	_Cursor[key] = data;
+end
+
+--------------------
+-- SetCursor
+-- Assigns a cursor
+-- key: Cursor key
+--------------------
+function SetCursor (key)
+	SDL.SetCursor(_Cursor[key]);	
+end

@@ -1,0 +1,224 @@
+-- Install the test screen.
+LoadScreen("Test",
+	-- Load --
+	function(s)
+		----------------
+		-- Installation
+		----------------
+		s.Pane = Backdrop(false);
+		s.Scene = class.new("Widget", UI);
+
+		-- Methods --
+		s.Scene:SetMethod{
+			update = function(x, y, w, h)
+				-- Update according to the current modes.
+				s:camera();
+				s:game();
+
+				-- Process actions.
+--				teams[1]:Update();
+--				teams[2]:Update();
+
+				-- Set the camera parameters.
+				Graphics.SetEye(s.eye);
+				Graphics.SetTarget(s.target);
+			end,
+			onKeyTrap = function(action, bPress)
+				-- Controls.
+				local controls = {
+					left = "bL", right = "bR", up = "bU", down = "bD",
+					a = "bLower", d = "bRaise",
+--h = "bl", u = "bu", j = "bd", k = "br",
+["1"] = "sl", ["2"] = "sr", ["3"] = "sd", ["4"] = "su", ["5"] = "syd", ["6"] = "syu", ["7"] = "srd", ["8"] = "sru",
+f = "dxd", g = "dxu", h = "dyd", j = "dyu", k = "dzd", l = "dzu", m = "flip"
+				};
+				if controls[action] then
+					s[controls[action]] = bPress;
+
+				-- Dialogs.
+				else
+					local dialogs = { g = "Goals", l = "Level", t = "Teams" };
+					if dialogs[action] then
+						s.game, s.restore = GamePaused, s.game;
+						Dialog(dialogs[action]);
+					end
+				end
+			end
+		};
+
+		-----------------
+		-- Docking: pane
+		-----------------
+		s.Scene:DockIn(s.Pane, "Normal", 0, 0, 1, 1);
+
+		-----------------
+		-- Loading: pane
+		-----------------
+		s:LoadFocusChain(s.Scene);
+	end,
+
+	-- Entry
+	-- bDibs: If true, player one goes first
+	-----------------------------------------
+	function(s, bDibs)
+		s.Pane:Frame(0, 0, vw, vh);
+
+		-- Position the camera.
+		s.eye, s.target, s.angle = Math.Vector(0, 1, -30), Math.v0(), 0;
+
+		-- Set up the dynamics system.
+		dynamics = class.new("Dynamics");
+		for _, material in ipairs{
+			{ type1 = "Ball", type2 = "Goal", action = Ball_Goal },
+			{ type1 = "Ball", type2 = "Player", action = Ball_Player },
+			{ type1 = "Ball", type2 = "solidwall", action = Ball_SolidWall },
+			{ type1 = "Player", type2 = "Player", action = Player_Player },
+			{ type1 = "Player", type2 = "solidwall", action = Player_SolidWall }
+		} do
+			dynamics:RegisterMaterial(material.type1, material.type2, material.action);
+		end
+
+		-- Set up the object and wall collections.
+		c_objects, c_walls = class.new("Collection"), class.new("Collection");
+
+		-- Assign wall properties.
+		c_walls:SetIterator("solidwall", function(object, time)
+			return GetRegions(object:GetPosition(), object:GetRadius() + .01, object:GetMotion() * time);
+		end);
+
+		-- Load the walls.
+		for row = 1, vCuts + 1 do
+			for column = 1, hCuts + 1 do
+				MakeQuad(column, row);
+			end
+		end
+
+		-- Put the players on the grid in default locations. Load the teams.
+		teams = {};
+		local l, r, b, t = 1, hCuts + 1, 1, vCuts + 1;
+		local hm = math.floor((l + r) / 2);
+		for team, row in ipairs{ b, t } do
+			local roster = {};
+			for player, column in ipairs{ l, math.floor((l + hm) / 2), hm, math.floor((r + hm) / 2), r } do
+				table.insert(roster, class.new("Player", column, row, 1.01, 1));
+				ConfigurePlayer(table.top(roster), team, player);
+				c_objects:AddElement(nil, table.top(roster));
+			end
+			table.insert(teams, class.new("Team", roster, team));
+			ConfigureTeam(table.top(teams), team);
+			table.top(teams):SetState(Team_Update);
+		end
+
+		-- Load the ball in a default location.
+		local w, h, d = GetScaleFactors();
+		local ball = class.new("Ball",
+--	Math.Vector(w / 2, 6, 0),
+	Math.Vector(0, .75, 0),
+		.5);
+		c_objects:AddElement(nil, ball);
+
+		-- Apply an impulse to the ball to send it into the court.
+		ball:SetMotion(Math.Vector(math.random(-1.25, 1.25), 1.5, bDibs and .85 or -.85));
+
+		-- Load the goals in default locations.
+		for _, column in ipairs{ l, r } do
+			c_objects:AddElement(nil, class.new("Goal", column, math.floor((b + t) / 2), 6, ball:GetRadius() + .05));
+		end
+
+		-- Set the default modes.
+		s.camera, s.game = CameraBasic, Game;
+
+		-- Load general assets.
+		s.ObjectP = Graphics.LoadPicture("Assets/Textures/Crazy.png", 0, 0, 1, 1);
+		s.WallP = Graphics.LoadPicture("Assets/Textures/Level/Queso.png", 0, 0, 1, 1);
+sp, sr = Math.Vector(0, 0, 0), 1;
+dx, dy, dz = 1, 1, 1;
+function DrawCell (y, z, x1, x2)
+	for x in pairs{ [x1] = true, [x2] = true } do
+		local center, dxV, dyV, dzV = Math.Vector(x * dx, y * dy, z * dz), Math.vXZ(dx, 0), Math.vY(dy), Math.vXZ(0, dz);
+		local below = center - (dxV + dyV + dzV) / 2;
+		local above = below + dyV;
+		for index, step in ipairs{ dzV, dxV, -dzV, -dxV } do
+			local belowTo, aboveTo = below + step, above + step;
+if index == 1 or index == 3 then
+	Graphics.SetColor(Math.Vector(0, 0, 1));
+else
+	Graphics.SetColor(Math.Vector(1, 0, 0));
+end
+			Graphics.DrawLine3D(below, belowTo);
+			Graphics.DrawLine3D(above, aboveTo);
+Graphics.SetColor(Math.Vector(0, 1, 0));
+			Graphics.DrawLine3D(below, above);
+			below, above = belowTo, aboveTo;
+		end
+	end
+end
+
+		-- Install a 3D drawing routine.
+		function Draw3D()
+if false then	--
+			-- Draw the objects.
+			Graphics.SetPicture(s.ObjectP);
+			for object in c_objects:Iter() do
+				object:Draw();
+if class.type(object) == "Player" and object:GetTeam():GetLeader() == object and object.DIFF then
+	Graphics.DrawLine3D(object:GetPosition(), object:GetPosition() + object.DIFF);
+elseif class.type(object) == "Ball" then
+	local p = object:GetPath();
+	for index = 1, #p do
+Graphics.SetColor(Math.Vector(0, 0, 1))
+		Graphics.DrawLine3D(p[index].position, p[index].position + Math.vY(3))
+Graphics.SetColor(Math.Vector(1, 0, 0))
+		Graphics.DrawLine3D(p[index].position, p[index].position + p[index].motion)
+Graphics.SetColor(Math.Vector(1, 1, 1))
+	end
+end
+			end
+end	--
+--
+if not FLIP then
+	Graphics.DrawSphere(sp, sr, 32, 32);
+end
+RenderSphereVolume(sp, sr, dx, dy, dz, DrawCell);
+Graphics.SetColor(Math.Vector(1, 1, 1));
+
+--			
+for i = 1, 2 do
+	local l = teams[i]:GetLeader();
+	if l then
+		l:Move(1, Math.vY(3.5));
+		l:Draw();
+		l:Move(1, Math.vY(-3.5));
+	end
+end
+if false then --
+for team = 1, 2 do
+	for state in teams[team]:GetCollection():Iter("height3") do
+		Graphics.SetColor(Math.Vector(0, 1, 0))
+		Graphics.DrawLine3D(state.position, state.position + Math.vY(3))
+		Graphics.SetColor(Math.Vector(1, 1, 1))
+	end
+	local index, str = 1, "Player ";
+	for player in teams[team]:Iter() do
+		str = str .. (index > 1 and ", " or "")
+		local states = { [Player_ReturnHome] = "RH", [Player_Shooter] = "S", [Player_Flanker] = "F" }
+		str = str .. string.format("(%i-%i): %s", team, index, states[player:GetState()] or "I")
+		index = index + 1;
+	end
+--	printf(str);
+end
+--printf("")
+
+			-- Draw the walls.
+			Graphics.SetPicture(s.WallP);
+			for wall in c_walls:Iter() do
+				wall:Draw();
+			end
+end --
+		end
+
+		-- Set the gravity constant.
+		gravity = .43;
+ball:Scout(dynamics, c_walls, 7, .05);
+	end
+);

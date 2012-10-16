@@ -1,0 +1,166 @@
+-----
+--
+------
+local function CanShootGoal (player, ball, goal)
+	local gp = Vec.TLen(player:GetPosition() - goal:GetPosition());
+	local goalNear, goalFar = .8, 27;
+	if gp > goalNear and gp < goalFar then
+		local pb, gb = Vec.Unit(ball:GetPosition() - player:GetPosition()), Vec.Unit(ball:GetPosition() - goal:GetPosition());
+		return pb * player:GetHeading() > math.cos(math.pi / 8) and
+			   gb * goal:GetFacing() > math.cos(math.pi / 4) and
+			   -pb * goal:GetFacing() > math.cos(math.pi / 8);
+	end
+end
+
+------
+--
+------
+local function GetBestGoalShot (choices, goal)
+	local best, bestscore;
+	for _, choice in ipairs(choices) do
+		local height = Trajectory.GetMaxHeight(choice.speed, choice.angle, gravity);
+		if height <= 1.55 * goal:GetPosition().y then
+			local score = 1.55 * goal:GetPosition().y - height;
+			if not bestscore or score < bestscore then
+				bestscore, best = score, choice;
+			end
+		end
+	end
+	return best;
+end
+
+------
+--
+------
+local function GetBestPathShot (paths)
+	if #paths > 0 then
+		return {
+			position = paths[1].where,
+			angle = Vec.Angle(paths[1].path[1].motion),
+			speed = #(paths[1].path[1].motion)
+		};
+	end
+end
+
+---------
+--
+---------
+local function GetChoices (player, ball, target)
+	local diff = target - ball:GetPosition();
+	local distance, total, choices = Vec.TLen(diff), #(player:GetMotion() + ball:GetMotion()), {};
+
+	-- Cache valid angle/speed combinations.
+	for angle in player:GetTeam():GetCollection():Iter("angles") do
+		for _, speed in ipairs{ Trajectory.GetSpeed(distance, diff.y, .5 * angle * math.pi, gravity) } do
+			table.insert(choices, { position = target, angle = .5 * angle * math.pi, speed = speed });				
+		end
+	end
+	for speed in player:GetTeam():GetCollection():Iter("speeds") do
+		for _, angle in ipairs{ Trajectory.GetAngles(distance, diff.y, speed * total, gravity) } do
+			table.insert(choices, { position = target, angle = angle, speed = speed * total });
+		end
+	end
+	return choices;
+end
+
+-------------------------------------
+--
+-------------------------------------
+local function Scout (ball)
+	local motion = ball:GetMotion();
+	ball:Scout(dynamics, c_walls, Trajectory.GetYTimes(ball:GetRadius() - ball:GetPosition().y, #motion, Vec.Angle(motion), gravity) + .15, .05);
+end
+
+--------------------------------
+-- Ball_Player
+-- Ball/player material handler
+-- ball: Ball handle
+-- player: Player handle
+-- time: Time of collision
+-- contact: Contact point
+-- normal: Contact normal
+--------------------------------
+function Ball_Player (ball, player, time, contact, normal)
+	ball:Move(.01, normal);
+	
+	-- If the contact player is the shooter, find a target.
+	local target;
+	if player:GetState() == Player_Shooter then
+		local goal = player:GetTeam():GetGoal();
+
+		--
+		if CanShootGoal(player, ball, goal) then
+			target = GetBestGoalShot(GetChoices(player, ball, goal:GetPosition()), goal);
+
+		--
+		else
+			local paths = {};
+			for shot in player:GetTeam():GetCollection():Iter("shots") do
+				local where = Math.vXZ(GetXZ(shot.column, shot.row));
+				for _, choice in ipairs(GetChoices(player, ball, where)) do
+					ball:SetMotion(Trajectory.GetVelocity(ball:GetPosition(), where, choice.speed, choice.angle, gravity, 0));				
+					Scout(ball);
+					table.insert(paths, { where = where, path = ball:GetPath() });
+				end
+			end
+			target = GetBestPathShot(paths);
+		end
+	end
+	
+	-- If a target is found, direct the ball toward it; otherwise, the ball glances off
+	-- the player. Put the player on the defensive.
+	if target then
+		ball:SetMotion(Trajectory.GetVelocity(ball:GetPosition(), target.position, target.speed, target.angle, gravity, 0));	
+	else
+		Deflect(ball, player, .9, .1);
+	end
+	player:SetState(Player_ReturnHome);
+
+	-- Scout ahead a short time to determine where the ball will go.
+	Scout(ball);
+end
+
+------------------------------
+-- Ball_Goal
+-- Ball/goal material handler
+-- ball: Ball handle
+-- goal: Goal handle
+-- time: Time of collision
+-- contact: Contact point
+-- normal: Contact normal
+------------------------------
+function Ball_Goal (ball, goal, time, contact, normal)
+	--
+	-- increment score
+local w, h, d = GetScaleFactors();
+local z = ball:GetPosition().z;
+local ball = class.new("Ball", Math.Vector(0, .75, 0), .5);
+c_objects:AddElement(1, ball);
+
+-- Apply an impulse to the ball to send it into the court.
+ball:SetMotion(Math.Vector(math.random(-1.25, 1.25), 1.5, z > 0 and -.85 or .85));
+Scout(ball);
+	--
+	-- hide ball, reset players, put game into setup
+end
+
+------------------------------------
+-- Ball_SolidWall
+-- Ball/solid wall material handler
+-- ball: Ball handle
+-- wall: Unused
+-- time: Time of collision
+-- contact: Contact point
+-- normal: Contact normal
+------------------------------------
+function Ball_SolidWall (ball, wall, time, contact, normal)
+	Bounce(ball, normal, 0, .9, .01);
+
+	-- If the ball is not building a path, scout ahead a short time to determine where it
+	-- will go; otherwise, add its current state to the path.
+	if ball:GetPathState() then
+		ball:AddToPath();
+	else
+		Scout(ball);
+	end
+end

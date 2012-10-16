@@ -1,0 +1,123 @@
+-----------------------------------------------------------
+-- ScrollButton class definition; inherits from PushButton
+-----------------------------------------------------------
+class.define("ScrollButton", {	
+	-- Gets the scroll button's target
+	-- Returns: Target and up scroll boolean
+	-----------------------------------------
+	GetTarget = function(S)
+		return S.target, S.bUp;
+	end,
+		
+	-- Binds a target to the scroll button
+	-- target: Target handle
+	-- bUp: Up scroll boolean
+	---------------------------------------
+	SetTarget = function(S, target, bUp)
+		-- Unbind any current target. Bind the new target.
+		W_CallIf(S.target, "onUnbind", S.bUp);
+		W_CallIf(target, "onBind", S, bUp);
+		
+		-- Store the properties.
+		S.target, S.bUp = target, bUp;
+	end
+},
+
+-- New
+-- state: State handle
+-----------------------
+function(S, state)
+	class.scons("PushButton", state);
+
+	-- Counter used to time scrolling when the button is held.
+	S.counter = class.new("Timer", function()
+		local target, bUp = S:GetTarget();
+		if target then
+			target:Call("onScroll", bUp, S.amount);
+		end			
+	end);
+
+	-- Methods --
+	S:SetMethod("event", function(event)
+		-- On grabs, enable the timer, executing immediately.
+		if event == WE.Grab then
+			S.counter:SetTimeout(S.timeout, true);
+			
+		-- On drops, disable the timer.
+		elseif event == WE.Drop then
+			S.counter:SetTimeout(nil);
+		
+		-- Update the timer.
+		elseif event == WE.PostUpkeep then
+			S.counter:Update();
+		end
+	end);
+end, { base = "PushButton" });
+
+----------------------------------
+-- ScrollButton
+-- Scroll button setup procedure
+-- target: Target handle
+-- bUp: Up scroll boolean
+-- timeout: Scroll repeat timeout
+-- amount: Scroll amount
+-- Returns: Scroll button handle
+----------------------------------
+function ScrollButton (target, bUp, timeout, amount)
+	local S = class.new("ScrollButton", UI);
+		S.amount, S.timeout = amount or 1, timeout;
+		S:SetPicture{
+			D = PictureC[bUp and "B_nlu" or "B_nld"],
+			E = PictureC[bUp and "B_elu" or "B_eld"],
+			G = PictureC[bUp and "B_glu" or "B_gld"]
+		};
+		S:SetTarget(target, bUp);
+	return S;
+end
+
+---------------------------------------
+-- ScrollPair
+-- Builds a scroll button pair
+-- target: Target handle
+-- timeout: Scroll repeat timeout
+-- amount: Scroll amount
+-- Returns: Up and down button handles
+---------------------------------------
+function ScrollPair (target, timeout, amount)
+	return ScrollButton(target, true, timeout, amount), ScrollButton(target, false, timeout, amount);
+end
+
+----------------------------------
+-- Spinner
+-- Spinner setup procedure
+-- target: Target handle
+-- bUp: Up scroll boolean
+-- timeout: Scroll repeat timeout
+-- amount: Scroll amount
+-- Returns: Spinner handle
+----------------------------------
+function Spinner (target, bUp, timeout, amount)
+	local S = class.new("ScrollButton", UI);
+		S.amount, S.timeout = amount or 1, timeout;
+		S:SetPicture{
+			D = PictureC.B_n,
+			E = PictureC.B_e,
+			G = PictureC.B_g
+		};
+		S:SetText("T24");
+		S:SetString(bUp and "+" or "-");
+		S:SetTarget(target, bUp);
+	return S;
+end
+
+----------------------------------------
+-- SpinnerPair
+-- Builds a spinner pair
+-- target: Target handle
+-- timeout: Scroll repeat timeout
+-- amount: Scroll amount
+-- Returns: Up and down spinner handles
+----------------------------------------
+function SpinnerPair (target, timeout, amount)
+	return Spinner(target, true, timeout, amount), Spinner(target, false, timeout, amount);
+end

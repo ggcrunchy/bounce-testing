@@ -1,0 +1,56 @@
+---------------------------------------------------
+-- Checkbox class definition; inherits from Widget
+---------------------------------------------------
+class.define("Checkbox", {
+	-- Gets the checkbox check state
+	-- Returns: Check state
+	---------------------------------
+	GetCheck = function(C)
+		return C.bCheck == true;
+	end,
+			
+	-- Sets the checkbox check state
+	-- bCheck: Check state to apply
+	-- bForceRefresh: If true, refresh unconditionally
+	---------------------------------------------------
+	SetCheck = function(C, bCheck, bForceRefresh)
+		if bCheck ~= C:GetCheck() or bForceRefresh then
+			C:RefreshAction(function()
+				C.bCheck = bCheck;
+			end);
+		end
+	end
+}, 
+
+-- New
+-- state: State handle
+-----------------------
+function(C, state)
+	class.scons("Widget", state);
+	C:SetMethod{
+		event = function(event)
+			if event == WE.Grab then
+				C:SetCheck(not C:GetCheck());
+			end
+		end,
+		update = function(x, y, w, h)
+			C:DrawPicture(C:GetCheck() and "C" or "D", x, y, w, h);
+			C:DrawFrame("D", x, y, w, h);
+		end
+	};
+end, { base = "Widget" });
+
+----------------------------
+-- Checkbox
+-- Checkbox setup procedure
+-- Returns: Checkbox handle
+----------------------------
+function Checkbox ()
+	local C = class.new("Checkbox", UI);
+		C:SetPicture{
+			D = PictureC.white,
+			C = PictureC.C_c
+		};
+		C:SetColor("f_D", 1, 0, 0);
+	return C;
+end

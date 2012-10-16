@@ -1,0 +1,150 @@
+-------------------------
+-- Team class definition
+-------------------------
+class.define("Team", {
+	-- Sends the team an alert
+	-- message: Alert message
+	-- ...: Alert arguments
+	---------------------------
+	Alert = function(T, message, ...)
+		local args = { ... };
+		T.pump:Add(function()
+			T:state("a_" .. message, unpack(args));
+		end);
+	end,
+
+	-- Gets the team's collection
+	-- Returns: Collection handle
+	------------------------------
+	GetCollection = function(T)
+		return T.collection;
+	end,
+
+	-- Gets a given team field
+	-- key: Field key
+	-- Returns: Field value
+	---------------------------
+	GetField = function(T, key)
+		return T.fields[key];
+	end,
+
+	-- Gets the team's goal
+	-- Returns: Goal handle
+	------------------------
+	GetGoal = function(T)
+		return c_objects:GetElement("Goal", T.goal);
+	end,
+
+	-- Gets the team leader
+	-- Returns: Player handle
+	--------------------------
+	GetLeader = function(T)
+		return T.leader;
+	end,
+
+	-- Gets the player at a spot
+	-- spot: Player spot
+	-- Returns: Player handle
+	-----------------------------
+	GetPlayer = function(T, spot)
+		return T.roster[spot];
+	end,
+
+	-- Gets the player's spot on the team
+	-- player: Player handle
+	-- Returns: Player spot
+	--------------------------------------
+	GetPlayerSpot = function(T, player)
+		return table.find(T.roster, player);
+	end,
+
+	-- Gets the team possession
+	-- Returns: If true, the team has the ball
+	-------------------------------------------
+	GetPossession = function(T)
+		return T.bPossession;
+	end,
+
+	-- Gets the side of a given position
+	-- position: Position to test
+	-- Returns: If true, the position is on the team side
+	------------------------------------------------------
+	GetSide = function(T, position)
+		local goal = T:GetGoal();
+		if goal then
+			return position.z * goal:GetFacing().z >= 0;
+		end
+	end,
+
+	-- Builds an iterator over the roster
+	-- Returns: Iterator which supplies players
+	--------------------------------------------
+	Iter = function(T)
+		local index = 0;
+		return function()
+			index = index + 1;
+			return T.roster[index];	
+		end;
+	end,
+
+	-- Assigns a given team field
+	-- key, value: Field key, value
+	--------------------------------
+	SetField = function(T, key, value)
+		T.fields[key] = value;
+	end,
+
+	-- Sets the team leader
+	-- leader: Player handle
+	-------------------------
+	SetLeader = function(T, leader)
+		T.leader = leader;
+	end,
+
+	-- Sets the team possession
+	-- bPossession: If true, the team gets the ball
+	------------------------------------------------
+	SetPossession = function(T, bPossession)
+		T.bPossession = bPossession;
+	end,
+
+	-- Sets the team state
+	-- state: State to assign
+	--------------------------
+	SetState = function(T, state)
+		if T.state ~= state then
+			-- Exit the team state, if any.
+			T:InvokeIf_("state", "exit");
+		
+			-- Enter the new state, if any.
+			T.state = state;
+			T:InvokeIf_("state", "enter");
+		end
+	end,
+
+	-- Updates the team
+	--------------------
+	Update = function(T)
+		-- Deal with alerts; ignore these if the team is idle. Update the team and players.
+		if T.state then
+			T.pump:Run();
+			T:state("update");
+		else
+			T.pump:Clear();
+		end
+		for player in T:Iter() do
+			player:Update();
+		end
+	end
+},
+
+-- New
+-- roster: Roster to assign to team
+-- goal: Goal assigned to team
+------------------------------------
+function(T, roster, goal)
+	T.collection, T.fields, T.goal, T.pump, T.roster = class.new("Collection"), {}, goal, class.new("Pump"), roster;
+	for _, player in ipairs(roster) do
+		player:SetTeam(T);
+	end
+end);

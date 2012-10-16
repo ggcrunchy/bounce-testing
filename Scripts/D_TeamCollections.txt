@@ -1,0 +1,61 @@
+-- Install the team collections dialog.
+LoadDialog("TeamCollections",
+	-- Load --
+	function(s)
+		----------------
+		-- Installation
+		----------------
+		s.Pane = Title("Teams", .125, false);
+		s.Grid = Grid(function(column, row)
+
+		end, function(column, row)
+
+		end, function(column, row, data, x, y, w, h)
+
+		end);
+		s.Team = Radiobox(.35, .9, false);
+		for index = 1, 2 do
+			s["TText" .. index] = StaticText(index, false, "T18", 0);
+		end
+		-- s.Collection = Combobox();
+
+		-----------
+		-- Docking
+		-----------
+		s.Team:DockIn(s.Pane, "Body", .05, .05, .2, .1);
+		local col = SpacedColumn(.025, .05, .275, .275, .2);
+			OK(s):DockIn(s.Pane, "Body", col());
+		s.Grid:DockIn(s.Pane, "Body", .4, .3, .5, .6);
+		for index = 1, 2 do
+			s["TText" .. index]:DockIn(s.Pane, "Body", -.025 + index * .1, .1125, .075, .2);
+		end
+		
+		-----------------
+		-- Loading: grid
+		-----------------
+		s.Grid:SetText("T18", 0);
+		
+		------------------------------------
+		-- Loading: team, player radioboxes
+		------------------------------------
+		for index = 1, 2 do
+			s.Team:AddOption(.5 * index - .3, .5);
+		end
+		
+		--------------------------------------
+		-- Loading: team, player static texts
+		--------------------------------------
+		for index, color in ipairs{
+			{ 1, 0, 0 }, { 0, 0, 1 }
+		} do
+			s["TText" .. index]:SetColor("S", unpack(color));
+		end
+	end,
+	
+	-- Entry
+	---------
+	function(s)
+		s.Pane:Frame(0, 0, .6, .6);
+		s.Grid:SetCuts(hCuts, vCuts);
+	end
+);

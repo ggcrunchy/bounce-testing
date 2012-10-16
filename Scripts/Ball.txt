@@ -1,0 +1,94 @@
+-----------------------------------------------
+-- Ball class definition; inherits from Object
+-----------------------------------------------
+class.define("Ball", {
+	-- Computes ball forces
+	-- step, objects, walls: Unused
+	--------------------------------
+	ComputeForce = function(B, step, objects, walls)
+		B.force = Math.vY(
+--	0,
+	-gravity
+		);
+	end,
+
+	-- Draws the ball
+	------------------
+	Draw = function(B)
+		Graphics.DrawSphere(B.position, B.radius, 32, 32);
+	end,
+
+	-- Gets the ball heading
+	-- Returns: Ball heading
+	-------------------------
+	GetHeading = function(B)
+		local motion = B:GetMotion();
+		return Vec.UnitF(motion.x, 0, Vec.TLen(motion) > 0 and motion.z or 1);
+	end,
+
+	-- Loads the ball state
+	-- state: State to load
+	------------------------
+	LoadState = function(B, state)
+		B:SetMotion(state.motion);
+		B.position = Vec.Copy(state.position);
+	end,
+------------------------------------------------
+Move = function(O, step, direction)
+	O.position = O.position + (direction or O:GetMotion()) * step;
+	if O.position.y < -10 then
+		local w, h, d = GetScaleFactors();
+local z = O.position.z;
+		local ball = class.new("Ball", Math.Vector(0, .75, 0), .5);
+		c_objects:AddElement(1, ball);
+
+		-- Apply an impulse to the ball to send it into the court.
+		ball:SetMotion(Math.Vector(math.random(-1.25, 1.25), 1.5, z > 0 and -.85 or .85));
+ball:Scout(dynamics, c_walls, 7, .05);
+	end
+end,
+------------------------------------------------
+	-- Saves the ball state
+	-- Returns: Saved state
+	------------------------
+	SaveState = function(B)
+		return {
+			heading = B:GetHeading(),
+			motion = B:GetMotion(),
+			position = B:GetPosition()
+		};
+	end,
+
+	-- Scouts ahead on the path
+	-- dynamics: Dynamics handle
+	-- walls: Set of walls in scene
+	-- time: Time to scout ahead
+	-- step: Time step
+	--------------------------------
+	Scout = function(B, dynamics, walls, time, step)
+		local state, set = B:SaveState(), class.new("Collection");
+
+		-- Load the ball into a single-element object collection and perform a dynamics run,
+		-- starting with the current state and closing with the end state. Collisions during
+		-- the run will be accumulated into the path.
+		B:AddToPath();
+		set:AddElement(nil, B);
+		while time > 0 do
+			dynamics:Run(set, walls, math.min(step, time), 20);
+			time = time - step;
+		end
+		B:AddToPath(true);
+
+		-- Restore the ball to its pre-scout state.
+		B:LoadState(state);	
+	end
+},
+
+-- New
+-- position: Ball position
+-- radius: Ball radius
+---------------------------
+function(B, position, radius)
+	class.scons("Object");
+	B.position, B.radius = position, radius;
+end, { base = "Object" });

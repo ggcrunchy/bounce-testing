@@ -1,0 +1,85 @@
+---------------------------
+-- Game
+-- Primary game mode
+-- section: Section handle
+---------------------------
+function Game (section)
+--	dynamics:Run(c_objects, c_walls, .05, 3);
+--
+	if section.bu then
+		c_objects:GetElement("Ball", 1):Move(.3, Math.vXZ(0, 1));
+	end
+	if section.bl then
+		c_objects:GetElement("Ball", 1):Move(.3, Math.vXZ(1, 0));
+	end
+	if section.bd then
+		c_objects:GetElement("Ball", 1):Move(.3, Math.vXZ(0, -1));
+	end
+	if section.br then
+		c_objects:GetElement("Ball", 1):Move(.3, Math.vXZ(-1, 0));
+	end
+--
+--
+	if section.su then
+		sp = sp + Math.vXZ(0, .2);
+	end
+	if section.sl then
+		sp = sp - Math.vXZ(.2, 0);
+	end
+	if section.sd then
+		sp = sp - Math.vXZ(0, .2);
+	end
+	if section.sr then
+		sp = sp + Math.vXZ(.2, 0);
+	end
+	if section.syd then
+		sp = sp - Math.vY(.2);
+	end
+	if section.syu then
+		sp = sp + Math.vY(.2);
+	end
+	if section.srd then
+		sr = math.max(sr - .05, .05);
+	end
+	if section.sru then
+		sr = sr + .05;
+	end
+	if section.dxd then
+		dx = math.max(dx - .05, .05);
+	end
+	if section.dxu then
+		dx = dx + .05;
+	end
+	if section.dyd then
+		dy = math.max(dy - .05, .05);
+	end
+	if section.dyu then
+		dy = dy + .05;
+	end
+	if section.dzd then
+		dz = math.max(dz - .05, .05);
+	end
+	if section.dzu then
+		dz = dz + .05;
+	end
+	if section.flip then
+		if TEST then
+			FLIP = not FLIP
+		end
+		TEST = false;
+	else
+		TEST = true;
+	end
+--
+end
+
+---------------------------
+-- GamePaused
+-- Paused game mode
+-- section: Section handle
+---------------------------
+function GamePaused (section)
+	if CurrentSection == section then
+		section.game = section.restore;
+	end
+end

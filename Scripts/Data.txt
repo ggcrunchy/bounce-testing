@@ -1,0 +1,101 @@
+-- Install the cursors.
+LoadCursor("std", SDL.GetCursor());
+
+--------------------
+-- Open-hand cursor
+--------------------
+LoadCursor("oh", {
+	"           XX   XX      ",
+	"      XX  X..X X..X     ",
+	"     X..X X..X X..X  X  ",
+	"     X..X X..X X..X X.X ",
+	"     X..X X..X X..X X.X ",
+	"     X...X....X....X..X ",
+	" XX  X................X ",
+	"X..X X..X....X....X...X ",
+	"X...X.................X ",
+	"X.....................X ",
+	" X....................X ",
+	"  X...................X ",
+	"   X.................X  ",
+	"    X...............X   ",
+	"     X.............X    ",
+	"      XXXXXXXXXXXXXX    "
+});
+
+--------------------
+-- Grab-hand cursor
+--------------------
+LoadCursor("gh", {
+	"                        ",
+	"                        ",
+	"           XX   XX      ",
+	"      XX  X..X X..X     ",
+	"     X..X X..X X..X XX  ",
+	"     X...X....X....X..X ",
+	"  XX X................X ",
+	" X...XX..X....X....X...X",
+	" X...X.................X",
+	" X.....................X",
+	"  X...................X ",
+	"  X...................X ",
+	"   X.................X  ",
+	"    X...............X   ",
+	"     X.............X    ",
+	"      XXXXXXXXXXXXXX    "
+});
+
+-- Install the text sets.
+TextC = {};
+for _, size in ipairs { 16, 18, 24 } do
+	TextC["T" .. size] = class.new("Text", "Assets/Fonts/Vera.ttf", size, "ABCDEFGHIJKLMNOPQRSTUVWXYZ=.!?,;:-+^()'/ 0123456789", 255, 255, 255);
+end
+
+-- Install the picture data.
+PictureC = {};
+for key, value in pairs{
+	---------------
+	-- Flat colors
+	---------------
+	white = { 1, 1, 2, 2 }, gray = { 5, 1, 6, 2 }, clear = { 1, 5, 2, 6 },
+	black = { 5, 5, 6, 6 }, blue = { 11, 11, 12, 12 }, purple = { 11, 3, 12, 4 },
+	
+	------------------
+	-- Checkbox check
+	------------------
+	C_c = { 1, 33, 30, 62 },
+	
+	--------------------
+	-- Radiobox options
+	--------------------
+	RO_o = { 0, 16, 15, 31 }, RO_c = { 16, 16, 31, 31 },
+	
+	---------------
+	-- Push button
+	---------------
+	B_n = { 0, 65, 31, 79 }, B_e = { 0, 81, 31, 95 }, B_g = { 0, 97, 31, 111 },
+	
+	--------------------
+	-- Scroll up button
+	--------------------
+	B_nlu = { 0, 130, 15, 138 }, B_elu = { 16, 130, 31, 138 }, B_glu = { 0, 148, 15, 156 },
+	
+	----------------------
+	-- Scroll down button
+	----------------------
+	B_nld = { 0, 164, 15, 172 }, B_eld = { 16, 164, 31, 172 }, B_gld = { 0, 180, 15, 188 },
+	
+	--------------
+	-- Slider bar
+	--------------
+	S_b = { 1, 225, 30, 238 },
+	
+	----------------
+	-- Slider thumb
+	----------------
+	ST_n = { 3, 196, 12, 203 }, ST_e = { 19, 196, 28, 203 }, ST_g = { 3, 212, 12, 219 }
+} do
+	local x1, y1, x2, y2 = unpack(value);
+	PictureC[key] = class.new("Picture");
+	PictureC[key]:LoadPicture("Assets/Textures/Main.png", x1 / 32, y1 / 256, x2 / 32, y2 / 256);
+end

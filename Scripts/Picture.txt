@@ -1,0 +1,207 @@
+----------------------------
+-- Picture class definition
+----------------------------
+class.define("Picture", {
+	-- Duplicates the picture
+	-- Returns: Copy handle
+	--------------------------
+	Copy = function(P)
+		-- Duplicate the properties.
+		local copy = table.copy(P);
+		
+		-- Load all pictures according to the picture type, using the same features.
+		if P:Type() == "Basic" then
+			copy.picture = P.picture and Graphics.LoadPicture(P.file, P:GetTexels());
+		else
+			for index, picture in ipairs(P.picture) do
+				copy.picture[index] = picture:Copy();
+			end
+		end
+		return copy;
+	end,
+
+	-- Draws the picture
+	-- x, y: Draw coordinates
+	-- w, h: Draw dimensions
+	--------------------------
+	Draw = function(P, x, y, w, h)
+		-- If the picture is a plain userdata, draw it. 
+		if P:Type() == "Basic" then
+			if P.picture then
+				local s1, t1, s2, t2 = P:GetTexels();
+				
+				-- Set the appropriate texels, flipping as necessary.
+				local S1, S2 = SwapIf(P.bHorizontal, s1, s2);
+				local T1, T2 = SwapIf(P.bVertical, t1, t2);
+				P:SetTexels(S1, T1, S2, T2);
+				
+				-- Draw the picture using the bound texels.
+				Graphics.DrawPicture(P.picture, x, y, w, h);
+				
+				-- Restore the original texels.
+				P:SetTexels(s1, t1, s2, t2);
+			else
+				Graphics.DrawBox(x, y, w, h, false);
+			end
+			
+		-- The picture may also be a table, broken up into nine images: four corners, four
+		-- sides, and the middle, where the corners remain fixed above a certain threshold,
+		-- while the sides and middle expand to accomodate the new size.
+		else
+			-- Figure out the side and corner dimensions.
+			local ew, eh = math.max(w - P.stretchw, 0), math.max(h - P.stretchh, 0);
+			w, h = math.min(P.stretchw, w) / 2, math.min(P.stretchh, h) / 2; 
+			
+			-- Iterate through the table entries. If an entry is a false boolean, disable
+			-- drawing until after a true boolean entry. If drawing is allowed, draw the
+			-- cell indexed by and formatted in the entry.
+			local bDraw = true;
+			for _, item in ipairs{
+				-----------
+				-- Corners
+				-----------
+				{ 1, x, y, w, h },
+				{ 3, x + w + ew, y, w, h },
+				{ 7, x, y + h + eh, w, h },
+				{ 9, x + w + ew, y + h + eh, w, h },
+				
+				------------------------
+				-- Top and bottom sides
+				------------------------
+				ew > 0,
+				{ 2, x + w, y, ew, h },
+				{ 8, x + w, y + h + eh, ew, h },
+
+				------------------------
+				-- Left and right sides
+				------------------------
+				eh > 0,
+				{ 4, x, y + h, w, eh },
+				{ 6, x + w + ew, y + h, w, eh },			
+		
+				----------
+				-- Middle
+				----------
+				ew > 0 and eh > 0,	
+				{ 5, x + w, y + h, ew, eh }
+			} do
+				if type(item) == "boolean" then
+					bDraw = item;
+				elseif bDraw then
+					local index, x, y, w, h = unpack(item);
+					P.picture[index]:Draw(x, y, w, h);
+				end
+			end
+		end
+	end,
+	
+	-- Flips a picture
+	-- bHorizontal: If true, flip horizontally
+	-- bVertical: If true, flip vertically
+	-------------------------------------------
+	Flip = function(P, bHorizontal, bVertical)
+		P.bHorizontal, P.bVertical = bHorizontal, bVertical;
+	end,
+	
+	-- Gets the picture file
+	-- Returns: Picture file
+	-------------------------
+	GetFile = function(P)
+		return P.file;
+	end,
+	
+	-- Gets the picture's flip states
+	-- Returns: Horizontal, vertical flip state
+	--------------------------------------------
+	GetFlips = function(P)
+		return P.bHorizontal == true, P.bVertical == true;
+	end,
+	
+	-- Gets the picture grid
+	-- Returns: Picture grid
+	-------------------------
+	GetGrid = function(P)
+		if P:Type() == "Multi" then
+			return P.picture;
+		end
+	end,
+	
+	-- Gets the picture texels
+	-- Returns: Picture texels
+	---------------------------
+	GetTexels = function(P)
+		if P:Type() == "Basic" then
+			return Graphics.GetPictureTexels(P.picture);
+		end
+	end,
+	
+	-- Gets the stretch thresholds
+	-- Returns: Threshold width and height
+	---------------------------------------
+	GetThresholds = function(P)
+		if P:Type() == "Multi" then
+			return P.stretchw, P.stretchh;
+		end
+	end,
+
+	-- Loads the picture data
+	-- file: Image file
+	-- s1, t1, s2, t2: Picture texels
+	-- Returns: If true, picture is loaded
+	---------------------------------------
+	LoadPicture = function(P, file, s1, t1, s2, t2)
+		-- Attempt to load the picture.
+		local picture = Graphics.LoadPicture(file, s1, t1, s2, t2);
+		if picture then
+			P.file, P.picture = file, picture;
+			return true;
+		end
+	end,
+	
+	-- Primes pictures of a given type
+	-- type: Picture type to prime
+	-----------------------------------
+	Prime = function(P, type)
+		P.file = "";
+		if type == "Basic" then
+			P.picture = nil;
+		else
+			P.picture, P.stretchw, P.stretchh = {}, 1 / 3, 1 / 3;
+			for _ = 1, 9 do
+				table.insert(P.picture, class.new("Picture"));
+			end
+		end
+	end,
+	
+	-- Sets the picture texels
+	-- s1, t1, s2, t2: Texels to assign
+	------------------------------------
+	SetTexels = function(P, s1, t1, s2, t2)
+		if P:Type() == "Basic" then
+			Graphics.SetPictureTexels(P.picture, s1, t1, s2, t2);
+		end
+	end,
+
+	-- Assigns a stretch threshold
+	-- threshold: Threshold type
+	-- stretch: Stretch factor to assign
+	-------------------------------------
+	SetThreshold = function(P, threshold, stretch)
+		if P:Type() == "Multi" then
+			P[threshold] = stretch;
+		end
+	end,
+		
+	-- Indicates the picture type
+	-- Returns: Type descriptor
+	------------------------------
+	Type = function(P)
+		return type(P.picture) == "table" and "Multi" or "Basic";
+	end
+},
+
+-- New
+-------
+function(P)
+	P.file = "";
+end);

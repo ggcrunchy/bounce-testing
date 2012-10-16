@@ -1,0 +1,62 @@
+------------------------
+-- Current tick counter
+------------------------
+local _Time;
+
+--------------------------
+-- Timer class definition
+--------------------------
+class.define("Timer", {
+	-- Gets the timeout
+	-- Returns: Current timeout
+	----------------------------
+	GetTimeout = function(tp)
+		return tp.timeout;
+	end,
+	
+	-- Primes the timer to a given timeout
+	-- timeout: Timeout to assign
+	-- bImmediate: If true, execute action immediately
+	---------------------------------------------------
+	SetTimeout = function(tp, timeout, bImmediate)
+		tp.base, tp.timeout = Time, timeout;
+		
+		-- Invoke the action.
+		CallIf(bImmediate, tp.action);
+	end,
+	
+	-- Updates the timer and performs actions on timeout
+	-----------------------------------------------------
+	Update = function(tp)
+		-- If the timeout has elapsed, perform the action and update the timer.
+		if tp.timeout and Time - tp.base > tp.timeout then
+			tp.base = Time;
+			tp.action();
+		end	
+	end
+},
+
+-- New
+-- action: Action to perform on timeout
+-- timeout: Timeout, in seconds
+----------------------------------------
+function(tp, action, timeout)
+	tp.action = action;
+	tp:SetTimeout(timeout);
+end);
+
+----------------------------------------------------
+-- Delay
+-- Delays the application, giving control to others
+-- milliseconds: Milliseconds to delay
+----------------------------------------------------
+function Delay (milliseconds)
+	_Time = nil;
+	SDL.Delay(milliseconds);
+end
+
+-- Override the time variable.
+BindVariable("Time", function()
+	_Time = _Time or SDL.GetTicks();
+	return _Time;	
+end, function()	end);

@@ -1,0 +1,38 @@
+---------------------------------
+-- CameraBasic
+-- Updates input-tracking camera
+-- section: Section handle
+---------------------------------
+function CameraBasic (section)
+	-- Update the view angle.
+	if section.bL then
+		section.angle = section.angle + math.pi / 64;
+	end
+	if section.bR then
+		section.angle = section.angle - math.pi / 64;
+	end
+	if section.angle >= 2 * math.pi then
+		section.angle = section.angle - 2 * math.pi;
+	end
+	if section.angle < 0 then
+		section.angle = section.angle + 2 * math.pi;
+	end
+
+	-- Update the view height.
+	if section.bLower then
+		section.eye.y = section.eye.y - .3;
+	end
+	if section.bRaise then
+		section.eye.y = section.eye.y + .3;	
+	end
+
+	-- Position the eye and target.
+	local dir = Math.vXZ(math.sin(section.angle), math.cos(section.angle));
+	if section.bU then
+		section.eye = section.eye + dir * .3;
+	end
+	if section.bD then
+		section.eye = section.eye - dir * .3;
+	end
+	section.target = section.eye + dir;
+end

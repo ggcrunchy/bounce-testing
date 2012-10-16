@@ -1,0 +1,83 @@
+---------------------
+-- Primary task pump
+---------------------
+local _Tasks = class.new("Pump");
+
+-----------------------
+-- GetKeyAction
+-- Gets a key action
+-- key: Key data
+-- Returns: Key action
+-----------------------
+local function GetKeyAction (key)
+	-- If a control key is pressed, indicate any accelerator action.
+	if Ops.AND(key.mod, SDL.KMOD_CTRL) ~= 0 then
+		if key.sym == SDL.K_c then
+			return "copy";
+		elseif key.sym == SDL.K_x then
+			return "cut";
+		elseif key.sym == SDL.K_v then
+			return "paste";
+		end
+	end
+	
+	-- Handle basic actions, if possible.
+	for _, action in ipairs{ "backspace", "delete", "left", "right", "up", "down", "tab", "escape" } do
+		if SDL["K_" .. action:upper()] == key.sym then
+			return action;
+		end
+	end
+
+	-- If letter keys are pressed, perform capitalization according to the state of the
+	-- Shift and Caps Lock modifiers: on a match, use lowercase; otherwise uppercase.
+	if key.sym >= SDL.K_a and key.sym <= SDL.K_z then
+		local char, state = string.char(key.sym), Ops.AND(key.mod, SDL.KMOD_SHIFT) ~= 0;
+		return Ops.ANDS(key.mod, SDL.KMOD_CAPS) ~= state and char:upper() or char;
+		
+	-- In the case of other valid keys, supply the corresponding character.
+	elseif key.sym >= SDL.K_0 and key.sym <= SDL.K_9 or key.sym == SDL.K_SPACE then
+		return string.char(key.sym);
+	end
+	
+	-- If all else fails, return the key.
+	return key;
+end
+
+-----------------------------------------
+-- RunTraps
+-- Runs pending events through any traps
+-----------------------------------------
+local function RunTraps ()
+	-- Process all events through the current traps.
+	while SDL.PollEvent(SDL._Event) ~= 0 do
+		local type = SDL._Event.type;
+		
+		-- Process key-related events.
+		if type == SDL.KEYDOWN or type == SDL.KEYUP then
+			CurrentSection:KeyTrap(GetKeyAction(SDL._Event.key.keysym), type == SDL.KEYDOWN);
+		end
+	end
+end
+
+------------------------------------
+-- UpdateInput
+-- Updates the editor's input state
+------------------------------------
+function UpdateInput ()
+	-- Trap pending events. Process the resulting tasks.
+	RunTraps();
+	Tasks:Run();
+	
+	-- Get the current mouse state and update the cursor. 
+	local buttons;
+	buttons, cx, cy = SDL.GetMouseState();
+	
+	-- Propagate the mouse state and cursor through the UI and process the resulting tasks.
+	UI:PropagateSignal(Ops.ANDS(buttons, SDL.BUTTON_LMASK));
+	Tasks:Run();
+end
+
+-- Override the tasks variable.
+BindVariable("Tasks", function()
+	return _Tasks;
+end, function() end);

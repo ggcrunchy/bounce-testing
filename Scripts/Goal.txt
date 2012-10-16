@@ -1,0 +1,44 @@
+-----------------------------------------------
+-- Goal class definition; inherits from Object
+-----------------------------------------------
+class.define("Goal", {
+	-- Draws the goal
+	------------------
+	Draw = function(G)
+		local angle = math.atan2(G.facing.z, G.facing.x);
+		Graphics.DrawDisk(G.position, math.deg(angle), G.radius + .5, G.radius, 16, 16);	
+	end,
+
+	-- Gets the goal cell
+	-- Returns: Goal column, row
+	-----------------------------
+	GetCell = function(G)
+		return GetCell(G.position.x, G.position.z);
+	end,
+
+	-- Gets the goal facing
+	-- Returns: Facing direction
+	-----------------------------
+	GetFacing = function(G)
+		return Math.vXZ(G.facing.z, -G.facing.x);
+	end,
+
+	-- Gets the goal side vector
+	-- Returns: Goal side vector
+	-----------------------------
+	GetSide = function(G)
+		return Math.vY(1) ^ G:GetFacing();
+	end
+}, 
+
+-- New
+-- column, row: Column, row indices
+-- h: Goal height
+-- radius: Goal radius
+------------------------------------
+function(G, column, row, h, radius)
+	class.scons("Object");
+	local x, z = GetXZ(column, row);
+	local w, _, d = GetScaleFactors(true);
+	G.facing, G.position, G.radius = Vec.UnitF(-x * w, 0, -z * d), Math.Vector(x, h, z), radius;
+end, { base = "Object" });

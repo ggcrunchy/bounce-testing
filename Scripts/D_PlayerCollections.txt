@@ -1,0 +1,151 @@
+-- Install the player collections dialog.
+LoadDialog("PlayerCollections",
+	-- Load --
+	function(s)
+		local options = {
+			General = { "ApproachRange", "MaxSpeed", "NeighborRange" },
+			Flocking = { "AlignmentScale", "CohesionScale", "SeparationScale" },
+			Targeting = { "FleeScale", "SeekScale" },
+			Wandering = { "WanderAngle", "WanderDistance", "WanderRadius", "WanderScale" }		
+		};
+
+		----------------------
+		-- Updates the dialog
+		----------------------
+		local function Update ()
+			local option = options[s.Behavior:GetHeading().text][s.Property:GetChoice()];
+			local first, last = s.player:GetRange(option);
+			s.First:SetString(" " .. string.format("%.4f", first));
+			s.Last:SetString(" " .. string.format("%.4f", last));
+			s.Slider:SetOffset(math.max(0, math.min(s.player:GetProperty(option, true), 1)), true);	
+		end
+
+		----------------
+		-- Installation
+		----------------
+		s.Pane = Title("Player", .125, false);
+		s.Behavior = Combobox(3);
+		s.Property = Radiobox(.9);
+		s.Slider = SliderHorz(.1, .9, .5, .1, .8);
+		for _, name in ipairs{ "First", "Last" } do
+			s[name] = StaticText("", true, "T16", 0);
+			s[name .. "U"], s[name .. "D"] = SpinnerPair(s[name], 250, .05);
+		end
+		s.Value = StaticText("", true, "T16", 0);
+
+		---------------------
+		-- Loading: combobox
+		---------------------
+		for _, name in ipairs{ "General", "Flocking", "Targeting", "Wandering" } do
+			s.Behavior:Append(name, nil);
+		end
+
+		-- Refresh --
+		s.Behavior:SetMethod("onRefresh", function(bNew)
+			if bNew then
+				local set = options[s.Behavior:GetHeading().text];
+				local h = (#set + .5) * .32 / 3;
+				s.Property:SetDimensions(nil, .08 / h);
+				s.Property:DockIn(s.Pane, "Body", .05, .225, .05, h);
+
+				-- Install the options and text.
+				s.text = {};
+				for index, item in ipairs(set) do
+					s.Property:AddOption(.5, (index - .5) * .32 / (3 * h));
+					table.insert(s.text, StaticText(item, false, "T16", 0));
+					table.top(s.text):DockIn(s.Pane, "Body", .125, .2425 + (index - 1) * .32 / 3, .2, .08);
+				end
+			else
+				for _, item in ipairs(s.text or {}) do
+					item:Remove();
+				end
+				s.Property:Clear();
+			end
+		end);
+
+		---------------------
+		-- Loading: radiobox
+		---------------------
+		-- Refresh --
+		s.Property:SetMethod("onRefresh", function(bNew)
+			if bNew then
+				Update();
+			end
+		end);
+
+		-------------------
+		-- Loading: slider
+		-------------------
+		-- Refresh --
+		s.Slider:SetMethod("onRefresh", function(bNew)
+			if bNew then
+				local option = options[s.Behavior:GetHeading().text][s.Property:GetChoice()];
+				s.player:SetProperty(option, s.Slider:GetOffset(), true);
+				s.Value:SetString(" " .. string.format("%.4f", s.player:GetProperty(option)));
+			end
+		end);
+
+		-------------------------
+		-- Loading: static texts
+		-------------------------
+		-- Scroll --
+		s.First:SetMethod("onScroll", function(bUp, amount)
+			local option = options[s.Behavior:GetHeading().text][s.Property:GetChoice()];
+			local first, last = s.player:GetRange(option);
+			if not bUp then
+				s.player:SetRange(option, first - amount, last);
+			elseif last - first > amount then
+				s.player:SetRange(option, first + amount, last);
+			end
+			Update();
+		end);
+		s.Last:SetMethod("onScroll", function(bUp, amount)
+			local option = options[s.Behavior:GetHeading().text][s.Property:GetChoice()];
+			local first, last = s.player:GetRange(option);
+			if bUp then
+				s.player:SetRange(option, first, last + amount);
+			elseif last - first > amount then
+				s.player:SetRange(option, first, last - amount);
+			end
+			Update();
+		end);
+
+		-----------
+		-- Docking
+		-----------
+		local row = SpacedRow(.05, .05, .05, .1, .14);
+			StaticText("Group", false, "T18", 0):DockIn(s.Pane, "Body", row());
+			s.Behavior:DockIn(s.Pane, "Body", row(.2));
+			StaticText("Property", false, "T18", 0):DockIn(s.Pane, "Body", row(.015));
+			s.Slider:DockIn(s.Pane, "Body", row(.1));	
+		local col = SpacedColumn(.18, .525, .2, .075, .1);
+			ScrollButton(s.Behavior, true, 300):DockIn(s.Pane, "Body", col());
+			ScrollButton(s.Behavior, false, 300):DockIn(s.Pane, "Body", col());
+		local col = SpacedColumn(.025, .55, .225, .05, .1);
+			for _, name in ipairs{ "First", "Last" } do
+				local row = SpacedRow(.025, col());
+					StaticText(name, false, "T18", 0):DockIn(s.Pane, "Body", row(.025));
+					s[name]:DockIn(s.Pane, "Body", row(.1));
+					s[name .. "D"]:DockIn(s.Pane, "Body", row());
+					s[name .. "U"]:DockIn(s.Pane, "Body", row());
+			end
+			local row = SpacedRow(.025, col());
+			StaticText("Value", false, "T18", 0):DockIn(s.Pane, "Body", row(.025));
+			s.Value:DockIn(s.Pane, "Body", row(.1));
+		OK(s):DockIn(s.Pane, "Body", .025, .775, .175, .2);
+	end,
+	
+
+	-- Entry
+	-- player: Player to manage
+	----------------------------
+	function(s, player)
+		s.Pane:Frame(0, 0, 1, .7);
+
+		-- Cache features.
+		s.player = player;
+
+		-- Refresh features for the given player.
+		s.Behavior:RefreshAction();
+	end
+);

@@ -1,0 +1,164 @@
+-- Install the home screen.
+LoadScreen("Home",
+	-- Load --
+	function(s)
+		----------------
+		-- Installation
+		----------------
+		s.Pane = Backdrop(true);
+		for _, value in ipairs{ "hCuts", "vCuts" } do
+			s[value] = EditboxBasic("4", "T18", FilterUnsigned(50), 300, 250);
+		end
+		for _, value in ipairs{ "W", "H", "D" } do
+			s[value] = SliderHorz(10, 164, 0, 20, 16);
+		end
+		s.Dibs = Checkbox();
+
+		-----------------
+		-- Docking: pane
+		-----------------
+		local col = SpacedColumn(16, 48, 64, 32, 32);
+			for _, value in ipairs{ "h", "v" } do
+				local row, key = SpacedRow(16, col()), value .. "Cuts";
+					StaticText(value .. "-cuts", false, "T18", 0):DockIn(s.Pane, "Normal", row(25));
+					s[key]:DockIn(s.Pane, "Normal", row());
+					local up, down = SpinnerPair(s[key], 300);
+						down:DockIn(s.Pane, "Normal", row());
+						up:DockIn(s.Pane, "Normal", row());
+			end
+		local col = SpacedColumn(16, 0, 360, 96, 48);
+			PushButton("Test", function()
+				hCuts, vCuts = tonumber(s.hCuts:GetString()) or 0, tonumber(s.vCuts:GetString()) or 0;
+
+				-------------------------------------
+				-- GetCell
+				-- Gets the cell matching a position
+				-- x, z: x, z components
+				-- Returns: Column, row
+				-------------------------------------
+				function GetCell (x, z)
+					local w, _, d = GetScaleFactors();
+					return math.floor((.5 - x / w) * (hCuts + 1)) + 1, math.floor((.5 - z / d) * (vCuts + 1)) + 1;
+				end
+
+				------------------------------------
+				-- Gets the index of a cell
+				-- column, row: Column, row indices
+				-- Returns: Index
+				------------------------------------
+				function GetIndex (column, row)
+					return (row - 1) * (hCuts + 1) + column;
+				end
+
+				------------------------------------------
+				-- GetRegions
+				-- Gets regions matching a position
+				-- where: Position vector
+				-- radius: Object radius
+				-- motion: Motion vector
+				-- Returns: Iterator which supplies index
+				------------------------------------------
+				function GetRegions (where, radius, motion)
+					-- Get the extents covered by the object in motion.
+					local where2 = where + motion;
+					local x1, z1, x2, z2 = SortPairs(where.x, where.z, where2.x, where2.z);
+					local maxx, maxz = GetCell(x1 - radius, z1 - radius);
+					local minx, minz = GetCell(x2 + radius, z2 + radius);
+
+					-- If the object is completely outside, invalidate the iterator.
+					local l, r = math.max(minx, 1), math.min(maxx, hCuts + 1);
+					local t, b = math.max(minz, 1), math.min(maxz, vCuts + 1);
+					if r < 1 or l > hCuts + 1 or b < 1 or t > vCuts + 1 then
+						t = b + 1;
+					end
+
+					-- Iterate through the rows: at the final column, add space to jump to
+					-- the next row and roll the marker back to the first column.
+					local dx, offset = r - l, GetIndex(l, t);
+					local space = hCuts + 1 - dx;
+					return function()
+						if t <= b then
+							local region = offset;
+							if l == r then
+								l, t, offset = l - dx, t + 1, offset + space;
+							else
+								l, offset = l + 1, offset + 1;
+							end
+							return region;
+						end
+					end;
+				end
+
+				----------------------------------------
+				-- GetXZ
+				-- Gets the center position of a square
+				-- column, row: Column, row indices
+				-- Returns: x, z components
+				----------------------------------------
+				function GetXZ (column, row)
+					local w, _, d = GetScaleFactors();
+					return w * (.5 - (column - .5) / (hCuts + 1)), d * (.5 - (row - .5) / (vCuts + 1));
+				end
+
+				-- Enter the main program with initial parameters.
+				Screen("Test", s.Dibs:GetCheck());
+			end):DockIn(s.Pane, "Normal", col());
+			PushButton("Quit", function()
+				Quit = true;
+			end):DockIn(s.Pane, "Normal", col());
+		local col = SpacedColumn(16, 320, 64, 192, 16);
+			for _, name in ipairs{ "W", "H", "D" } do
+				local row = SpacedRow(16, col());
+					s[name]:DockIn(s.Pane, "Normal", row());
+					StaticText(name, false, "T18", 0):DockIn(s.Pane, "Normal", row());
+			end
+		local col = SpacedColumn(16, 48, 168, 16, 16);
+			local row = SpacedRow(16, col());
+				s.Dibs:DockIn(s.Pane, "Normal", row());
+				StaticText("Dibs to player 1?", false, "T18", 0):DockIn(s.Pane, "Normal", row(192));
+
+		----------------------
+		-- Loading: editboxes
+		----------------------
+		-- Scroll --
+		for _, value in ipairs{ "hCuts", "vCuts" } do
+			local key = value;
+			s[value]:SetMethod("onScroll", function(bUp, count)
+				local cuts = tonumber(s[key]:GetString()) or 0;
+				s[key]:SetString(bUp and math.min(cuts + 1, 50) or math.max(cuts - 1, 4));
+			end);
+		end
+
+		-----------------
+		-- Loading: pane
+		-----------------
+		s:LoadFocusChain(s.hCuts, s.vCuts);
+
+		---------------------------------
+		-- GetScaleFactors
+		-- Gets the scale factors
+		-- bCuts: If true, apply cuts
+		-- Returns: Width, height, depth
+		---------------------------------
+		function GetScaleFactors (bCuts)
+			local w, h, d = s.W:GetOffset() * 50, s.H:GetOffset() * 50, s.D:GetOffset() * 50;
+			if bCuts then
+				w, d = w / (hCuts + 1), d / (vCuts + 1);
+			end
+			return w, h, d;
+		end
+	end,
+
+	-- Entry --
+	function(s)
+		s.Pane:Frame(0, 0, vw, vh);
+
+		-- Begin in 2D mode.
+		Graphics.Enter2D();
+
+		-- Set the scale factors.
+		for which, offset in pairs{ W = .5, H = .1, D = .5 } do
+			s[which]:SetOffset(offset);
+		end
+	end
+);

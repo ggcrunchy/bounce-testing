@@ -1,0 +1,188 @@
+------------------------------
+-- GetMaterial
+-- Looks up a material
+-- D: Dynamics handle
+-- type1, type2: Object types
+-- Returns: Response routine
+------------------------------
+local function GetMaterial (D, type1, type2)
+	if type1 <= type2 then
+		return D.materials[type1 .. "_" .. type2];
+	end
+end
+
+---------------------------------------------
+-- ObjectObject
+-- Performs object-object collision
+-- O1, O2: Object handles
+-- limit: Maximum permissible collision time
+-- Returns: Collision time, point, normal
+---------------------------------------------
+local function ObjectObject (O1, O2, limit)
+	return Collision.Spheres(O1:GetSphere(), O2:GetSphere(), O1:GetMotion(), O2:GetMotion(), limit);
+end
+
+---------------------------------------------
+-- ObjectWall
+-- Performs object-wall collision
+-- object: Object handle
+-- wall: Wall handle
+-- limit: Maximum permissible collision time
+-- Returns: Collision time, point, normal
+---------------------------------------------
+local function ObjectWall (object, wall, limit)
+	return Collision.SphereQuad(object:GetSphere(), wall:GetQuad(), object:GetMotion(), limit);
+end
+
+--------------------------
+-- Processes the hit
+-- hits: Hits state
+-- O1, O2: Object handles
+--------------------------
+local function ProcessHit (hits, O1, O2)
+	local time, contact, normal = CallIf(O1 ~= O2, hits.test, O1, O2, hits.time + .001);
+	if time then
+		-- If the time is not simultaneous with earlier hits, empty the set of concurrent
+		-- hits and update the minimum time. Add the hit to the set.
+		if math.abs(time - hits.time) > .001 then
+			hits.set, hits.time = {}, time;
+		end
+		table.insert(hits.set, { action = hits.action, o1 = O1, o2 = O2, contact = contact, normal = normal });
+	end
+end
+
+-----------------------------
+-- Dynamics class definition
+-----------------------------
+class.define("Dynamics", {
+	-- Registers a material
+	-- type1, type2: Material types
+	-- response: Collision response routine
+	----------------------------------------
+	RegisterMaterial = function(D, type1, type2, response)
+		if type2 < type1 then
+			response, type1, type2 = function(o1, o2, time, contact, normal)
+				response(o2, o1, time, contact, normal);
+			end, type2, type1;
+		end
+		D.materials[type1 .. "_" .. type2] = response;
+	end,
+
+	-- Runs collision tests
+	-- objects: Object collection handle
+	-- walls: Wall collection handle
+	-- step: Time step to update over
+	-- limit: Run limit
+	-------------------------------------
+	Run = function(D, objects, walls, step, limit)
+		-- Build a list of valid materials.
+		local otypes, wtypes = {}, {};
+		for type1 in objects:GetTypes() do
+			otypes[type1], wtypes[type1] = {}, {};
+			for type2 in objects:GetTypes() do
+				otypes[type1][type2] = GetMaterial(D, type1, type2);
+			end
+			for type2 in walls:GetTypes() do
+				wtypes[type1][type2] = GetMaterial(D, type1, type2);
+			end
+		end
+
+		-- Determine forces to be used during this time step.
+		for object in objects:Iter() do
+			object:ComputeForce(step, objects, walls);
+		end
+
+		-- At each step, find the earliest hit and update up to that point. Cut out if the
+		-- run limit is reached, in case the objects in the scene have become stuck.
+		local run = 0;
+		repeat
+			local hits = { set = {}, time = step };
+			for type1, set in pairs(otypes) do
+				for O1 in objects:Iter(type1) do
+					-- Object-object collisions.
+					hits.test = ObjectObject;
+					for type2, action in pairs(set) do
+						hits.action = action;
+						for O2 in objects:Iter(type2) do
+							ProcessHit(hits, O1, O2);
+						end
+					end
+
+					-- Object-wall collisions.
+					hits.test = ObjectWall;
+					for type2, action in pairs(wtypes[type1]) do
+						hits.action = action;
+						for wall in walls:Iter(type2, O1, hits.time) do
+							ProcessHit(hits, O1, wall);
+						end
+					end
+				end
+			end
+
+			-- Move all objects up to the time of the earliest hit.
+			for object in objects:Iter() do
+				object:Move(hits.time);
+			end
+
+			-- Respond to the earliest hits that occurred.
+			for _, hit in ipairs(hits.set) do
+				hit.action(hit.o1, hit.o2, hits.time, hit.contact, hit.normal);
+			end
+
+			-- Apply forces. Advance the time step and run counter.
+			for object in objects:Iter() do
+				object:ApplyForce(hits.time);
+			end
+			step, run = step - hits.time, run + 1;
+		until step <= 0 or run == limit;
+	end
+},
+
+-- New
+-------
+function(D)
+	D.materials = {};
+end);
+
+-----------------------------------
+-- Bounce
+-- Performs a sphere bounce
+-- object: Object handle
+-- normal: Normal vector
+-- friction: Friction factor
+-- restitution: Restitution factor
+-- epsilon: Displacement factor
+-----------------------------------
+function Bounce (object, normal, friction, restitution, epsilon)	
+	-- Reverse the object's heading.
+	local motion = object:GetMotion();
+	if #motion > 0 then
+		local reflect = Collision.Reflect(normal, motion);
+--		local tangent = Collision.Slide(normal, reflect * restitution, gravity, .05);
+		object:SetMotion(
+	--	tangent and tangent * (1 - friction) or 
+		reflect * restitution);
+	end
+
+	-- Displace the object away from the collision.
+	object:Move(epsilon, normal);
+end
+
+------------------------------------
+-- Deflect
+-- Performs inter-object deflection
+-- object1, object2: Object handles
+-- restitution: Restitution factor
+-- epsilon: Displacement factor
+------------------------------------
+function Deflect (object1, object2, restitution, epsilon)	
+	-- Alter the objects' momenta.
+	local m1, v1 = 1, object1:GetMotion();
+	local m2, v2 = 1, object2:GetMotion();
+	object1:SetMotion((v1 * (m1 - m2 * restitution) + v2 * m2 * (1 + restitution)) / (m1 + m2));
+--	object2:SetMotion((v2 * (m2 - m1 * restitution) + v1 * m1 * (1 + restitution)) / (m1 + m2));
+
+	-- Displace the objects away from one another.
+	object1:Move(epsilon);
+--	object2:Move(epsilon);
+end

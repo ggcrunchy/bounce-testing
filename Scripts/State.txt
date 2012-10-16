@@ -1,0 +1,87 @@
+---------------------------------
+-- EnvConfigure
+-- Configures an environment
+-- env: Environment to configure
+---------------------------------
+function EnvConfigure (env)
+	local getf, setf = {}, {};
+
+	---------------------------------------------
+	-- Binds routines to an environment variable
+	-- variable: Variable to bind
+	-- get, set: Get and set routines
+	---------------------------------------------
+	function env.BindVariable (variable, get, set)
+		getf[variable], setf[variable] = get, set;
+	end
+
+	-- Bind the metatable system to the environment.
+	setmetatable(env, {
+		__index = function(_, key)
+			if getf[key] then
+				return getf[key]();
+			end
+		end,
+		__newindex = function(_, key, value)
+			if setf[key] then
+				setf[key](value);
+			else
+				rawset(env, key, value);
+			end	
+		end
+	});
+end
+
+--------------------------------------------
+-- fprintf
+-- Prints a formatted message to a file
+-- file: File handle or name of file to set
+-- text: Format string
+-- ...: Arguments to string
+--------------------------------------------
+function fprintf (file, text, ...)
+	local stream = type(file) ~= "string" and file or io.open(file, "a");
+	stream:write(text:format(...), "\n");
+	if file ~= stream then
+		stream:close();
+	end
+end
+
+------------------------------
+-- LoadRoutines
+-- Installs a set of routines
+-- routines: Routine set
+-- Returns: Success boolean
+------------------------------
+function LoadRoutines (routines)
+	for _, entry in ipairs(routines) do
+		-- If an entry is a string, load the script it references.
+		if type(entry) == "string" then
+			local file, error = loadfile("Scripts/" .. entry);
+			if not file then
+				printf("Unable to load script: " .. entry);
+				printf(error);
+				return false;
+			end
+			file();
+
+		-- If an entry is a function, evaluate it. Non-nil results indicate failure.
+		elseif type(entry) == "function" then
+			if entry() then
+				return false;
+			end
+		end
+	end
+	return true;
+end
+
+------------------------------
+-- printf
+-- Prints a formatted message
+-- text: Format string
+-- ...: Arguments to string
+------------------------------
+function printf (text, ...)
+	print(text:format(...));
+end
+

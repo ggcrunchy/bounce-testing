@@ -1,0 +1,41 @@
+-------------------------
+-- Wall class definition
+-------------------------
+class.define("Wall", {
+	-- Draws the wall
+	------------------
+	Draw = function(W)
+		local quad = W:GetQuad();
+		if W.type == "solidwall" then
+			Graphics.DrawQuad(quad.ul, quad.ur, quad.lr, quad.ll, quad.normal);
+		end
+	end,
+
+	-- Gets the wall quad
+	-- Returns: Wall quad
+	----------------------
+	GetQuad = function(W)
+		return W.quad;
+	end,
+
+	-- Assigns a quad to the wall
+	-- ul, ur, ll, lr: Quad corners
+	--------------------------------
+	SetQuad = function(W, ul, ur, ll, lr)
+		W.quad = Math.Quad(ul, ur, ll, lr);
+	end,
+	
+	-- Gets the wall type
+	-- Returns: Wall type
+	----------------------
+	Type = function(W)
+		return W.type;
+	end
+},
+
+-- New
+-- type: Type of wall
+----------------------
+function(W, type)
+	W.type = type;
+end);

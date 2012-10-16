@@ -1,0 +1,96 @@
+-- Install the level dialog.
+LoadDialog("Level",
+	-- Load --
+	function(s)
+		----------------
+		-- Installation
+		----------------
+		s.Pane = Title("Level", .15, false);
+		s.Grid = Grid(function(column, row)
+			MakeQuad(column, row);
+		end, function(column, row)
+			return s.pictures[s.Grid:Index(column, row)];
+		end, function(column, row, data, x, y, w, h)
+			data:Draw(x, y, w, h, true);
+		end);
+		s.Item = Combobox(3);
+		
+		--------------------------
+		-- Loading: item combobox
+		--------------------------
+		local f, t = false, true;
+		local fff, fft, ftf, ftt = { f, f, f }, { f, f, t }, { f, t, f }, { f, t, t };
+		local tff, tft, ttf, ttt = { t, f, f }, { t, f, t }, { t, t, f }, { t, t, t };
+		for _, entry in ipairs{
+			{ name = "Floor", template = { tff, fff, fft, tft } },
+			{ name = "E Floor", template = { ttf, ftf, ftt, ttt } },
+			{ name = "NW", template = { ttf, ftt, fft, tff } },
+			{ name = "NE", template = { ttt, ftf, fff, tft } },
+			{ name = "SW", template = { ftf, ttt, tft, fff } },
+			{ name = "SE", template = { ftt, ttf, tff, fft } },
+			{ name = "N Side", template = { ttf, ftf, fff, tff } },
+			{ name = "W Side", template = { ftf, ftt, fft, fff } },
+			{ name = "E Side", template = { ttt, ttf, tff, tft } },
+			{ name = "S Side", template = { ftt, ttt, tft, fft } },
+			{ name = "N Slope", template = { ttf, ftf, fft, tft } },
+			{ name = "W Slope", template = { ftf, ftt, tft, tff } },
+			{ name = "E Slope", template = { ttt, ttf, fff, fft } },
+			{ name = "S Slope", template = { ftt, ttt, tff, fff } }
+		} do
+			s.Item:Append(entry.name, entry.template);
+		end
+			
+		-----------
+		-- Docking
+		-----------
+		s.Item:DockIn(s.Pane, "Body", .05, .2, .3, .14);
+		local col = SpacedColumn(.215, .375, .35, .075, .1);
+			ScrollButton(s.Item, true, 300):DockIn(s.Pane, "Body", col());
+			ScrollButton(s.Item, false, 300):DockIn(s.Pane, "Body", col());
+		OK(s):DockIn(s.Pane, "Body", .05, .7, .25, .2);
+		s.Grid:DockIn(s.Pane, "Body", .4, .2, .5, .7);
+		
+		------------------------------------
+		-- MakeQuad
+		-- Generates a new quad
+		-- column, row: Column, row indices
+		------------------------------------
+		function MakeQuad (column, row)
+			-- Bind a display picture.
+			local index, type = GetIndex(column, row), s.Item:GetHeading().text;
+			s.pictures[index] = class.new("Picture");
+			s.pictures[index]:LoadPicture("Assets/Textures/Level/" .. type .. ".png", 0, 0, 1, 1);
+
+			-- Find the initial parameters.
+			local x, z = GetXZ(column, row);
+			local w, h, d = GetScaleFactors(true);
+			local dim = { -w, h, -d };
+			local pos = { x - dim[1] / 2, 0, z - dim[3] / 2 };
+
+			-- Compute the corners.
+			local corners = {};
+			for _, addset in ipairs(s.Item:GetHeading().datum) do
+				local vertex = {};
+				for index = 1, 3 do
+					table.insert(vertex, pos[index] + (addset[index] and dim[index] or 0));
+				end
+				table.insert(corners, Math.Vector(vertex[1], vertex[2], vertex[3]));
+			end
+
+			-- Generate and return the quad.
+			local wall = class.new("Wall", "solidwall");
+			wall:SetQuad(unpack(corners));
+			c_walls:AddElement(index, wall);
+		end
+
+		-- Set of grid display pictures.
+		s.pictures = {};
+	end,
+	
+	-- Entry
+	---------
+	function(s)
+		s.Pane:Frame(0, 0, .6, .6);
+		s.Grid:SetCuts(hCuts, vCuts);
+	end
+);

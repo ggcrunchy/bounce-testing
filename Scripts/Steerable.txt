@@ -1,0 +1,232 @@
+------------------------------
+-- AddForce
+-- Accumulates a force
+-- S: Steerable handle
+-- name: Name of force to add
+-- force: Force to add
+------------------------------
+local function AddForce (S, name, force)
+	S.forces[name] = force * S:GetProperty(name .. "Scale");
+end
+
+------------------------------------
+-- GetFinalForce
+-- Gets the final accumulated force
+-- S: Steerable handle
+-- Returns: Final force
+------------------------------------
+local function GetFinalForce (S)
+	local force = Math.v0();
+	for _, name in ipairs(S.order) do
+		if S.forces[name] then
+			force = force + S.forces[name];
+		end	
+	end
+	return force;
+end
+
+------------------------------------
+-- GetGroupForces
+-- Gets the sum group force
+-- S: Steerable handle
+-- objects: Set of neighbor objects
+------------------------------------
+local function GetGroupForces (S, objects)
+	local heading, center, separation = Math.v0(), Math.v0(), Math.v0();
+
+	-- Accumulate the requested forces.
+	local where = S:GetPosition();
+	for _, object in ipairs(objects) do
+		if S.bAlignment then
+			heading = heading + object:GetHeading();
+		end
+		local position = object:GetPosition();
+		if S.bCohesion then
+			center = center + position;
+		end
+		if S.bSeparation then
+			separation = separation + Vec.SphereInvert(where - position);
+		end
+	end
+
+	-- Load any valid forces.
+	CallIf(S.bAlignment, AddForce, S, "Alignment", heading / #objects - S:GetHeading());
+	CallIf(S.bCohesion, AddForce, S, "Cohesion", center / #objects - where);
+	CallIf(S.bSeparation, AddForce, S, "Separation", separation);
+end
+
+-------------------------
+-- GetTargetForce
+-- Gets the target force
+-- S: Steerable handle
+-------------------------
+local function GetTargetForce (S)
+	local method, move = S.target();
+	if method == "seek" then
+		AddForce(S, "Seek", move);
+	elseif method == "flee" then
+
+	end
+end
+
+-----------------------
+-- GetWallForce
+-- Gets the wall force
+-- S: Steerable handle
+-----------------------
+local function GetWallForce (S)
+
+end
+
+-------------------------
+-- GetWanderForce
+-- Gets the wander force
+-- S: Steerable handle
+-------------------------
+local function GetWanderForce (S)
+	local angle = math.pi / 2 + S:GetProperty("WanderAngle") * (math.random() - .5);
+	local cos, sin = math.cos(angle), math.sin(angle);
+	local veer = S:GetSide() * (cos >= 0 and sin or -sin) + S:GetHeading() * math.abs(cos);
+	AddForce(S, "Wander", S:GetHeading() * S:GetProperty("WanderDistance") + veer * S:GetProperty("WanderRadius"));
+end
+
+----------------------------------------------------
+-- Steerable class definition; inherits from object
+----------------------------------------------------
+class.define("Steerable", {
+	-- Enables or disables group forces
+	-- bAlignment: If true, enable alignment
+	-- bCohesion: If true, enable cohesion
+	-- bSeparation: If true, enable separation
+	-------------------------------------------
+	EnableGroupForces = function(S, bAlignment, bCohesion, bSeparation)
+		S.bAlignment, S.bCohesion, S.bSeparation = bAlignment, bCohesion, bSeparation;
+	end,
+
+	-- Enables or disables target force
+	-- target: Targeting method
+	------------------------------------
+	EnableTargetForce = function(S, target)
+		S.target = target;
+	end,
+
+	-- Enables or disables wall force
+	----------------------------------
+	EnableWallForce = function(S)
+
+	end,
+
+	-- Enables or disables wander force
+	-- bWander: If true, enable force
+	------------------------------------
+	EnableWanderForce = function(S, bWander)
+		S.wander = bWander;
+	end,
+
+	-- Gets the steering force to be applied
+	-- objects: Set of neighboring objects
+	-- walls: Set of neighboring walls
+	-- Returns: Steering force
+	-----------------------------------------
+	GetForce = function(S, objects, walls)
+		S.forces = {};
+		CallIf(#objects > 0, GetGroupForces, S, objects);
+		CallIf(S.target, GetTargetForce, S);
+		CallIf(#walls > 0, GetWallForce, S, walls);
+		CallIf(S.wander, GetWanderForce, S);
+		return GetFinalForce(S);
+	end,
+
+	-- Gets the force application order
+	-- Returns: Order set
+	------------------------------------
+	GetOrder = function(S)
+		return table.copy(S.order);
+	end,
+
+	-- Gets the requested steering property
+	-- name: Property name
+	-- bUnit: If true, scale to [0, 1]
+	-- Returns: Steerable property
+	----------------------------------------
+	GetProperty = function(S, name, bUnit)
+		local first, last = S:GetRange(name);
+		local value = S.property[name] or last;
+		return bUnit and (value - first) / (last - first) or value;
+	end,
+
+	-- Gets the range covered by the steering property
+	-- name: Property name
+	-- Returns: First, last values of range
+	---------------------------------------------------
+	GetRange = function(S, name)
+		local range = S.range[name] or {};
+		local first = range.first or 0;
+		return first, range.last or first + 1;
+	end,
+
+	-- Builds an iterator over the steering properties and ranges
+	-- Returns: Iterator which supplies properties, ranges
+	--------------------------------------------------------------
+	Properties = function(S)
+		-- Build a set of assigned properties and ranges. If there is both a valid
+		-- property and range, assign both to a common element.
+		local set = {};
+		for name, property in pairs(S.property) do
+			set[name] = { property = property };
+		end
+		for name, range in pairs(S.range) do
+			set[name] = set[name] or {};
+			set[name].first, set[name].last = range.first, range.last;
+		end
+
+		-- Return items from the set.
+		local name;
+		return function()
+			name = next(set, name);
+			if name then
+				local item = set[name];
+				return name, item.property, item.first, item.last;
+			end
+		end;
+	end,
+
+	-- Sets the force application order
+	-- order: Order set
+	------------------------------------
+	SetOrder = function(S, order)
+		S.order = table.copy(order);
+	end,
+
+	-- Sets the requested steering property
+	-- name: Property name
+	-- value: Value to assign
+	-- bUnit: If true, value is in [0, 1]
+	----------------------------------------
+	SetProperty = function(S, name, value, bUnit)
+		if bUnit then
+			local first, last = S:GetRange(name);
+			value = first + value * (last - first);
+		end
+		S.property[name] = value;
+	end,
+
+	-- Sets the range covered by the steering property
+	-- name: Property name
+	-- first, last: First, last values of range
+	---------------------------------------------------
+	SetRange = function(S, name, first, last)
+		S.range[name] = { first = first, last = last };
+	end
+},
+
+-- New
+-------
+function(S)
+	class.scons("Object");
+	S.order, S.property, S.range = {
+		"Flee", "Seek",
+		"Alignment", "Cohesion", "Separation",
+		"Wander"
+	}, {}, {};
+end, { base = "Object" });

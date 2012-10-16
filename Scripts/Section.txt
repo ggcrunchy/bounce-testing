@@ -1,0 +1,245 @@
+------------------------
+-- Section table, stack
+------------------------
+local _Section, _Stack = {}, {};
+
+-----------------------------------
+-- Launch
+-- Launches a section
+-- name: Section name
+-- prologue: Prologue logic
+-- epilogue: Epilogue logic
+-- ...: Arguments to entry routine
+-----------------------------------
+local function Launch (name, prologue, epilogue, ...)
+	-- Invoke the launch prologue.
+	prologue();
+	
+	-- Wipe out current input.
+	UI:ClearInput();
+	
+	-- Push the section onto the stack.
+	table.insert(_Stack, { epilogue = epilogue, section = _Section[name] });
+	
+	-- Run the entry routine on the section.
+	_Section[name]:Switch("Entry");
+	_Section[name]:enter(...);
+	_Section[name]:Switch("Normal");
+end
+
+--------------------------
+-- Load
+-- Loads a section
+-- name: Section name
+-- load: Load routine
+-- enter: Entry routine
+-- close: Close routine
+-- switch: Switch routine
+--------------------------
+local function Load (name, load, enter, close, switch)
+	-- Make and load the section.
+	_Section[name] = class.new("Section", load, switch);
+
+	-- Install the entry, close, and switch routines.
+	_Section[name].enter, _Section[name].close, _Section[name].switch = enter, close, switch;
+end
+
+-----------------------
+-- Pop
+-- Pop one stack level
+-----------------------
+local function Pop ()
+	-- Unload the section frame entry.
+	UI:GetFrameHead():Unload();
+		
+	-- Pop the section from the stack. Invoke its epilogue.
+	table.remove(_Stack).epilogue();
+end
+
+----------------------------
+-- Section class definition
+----------------------------
+class.define("Section", {
+	-- Builds a section close routine
+	-- bCancel: If true, cancel on close
+	-- Returns: Closure to close section
+	-------------------------------------
+	Close = function(S, bCancel)
+		return function()
+			S:Switch("Close");
+			S:InvokeIf_("close", bCancel);
+			Pop();
+		end
+	end,
+	
+	-- Builds a conditional section close routine
+	-- bCancel: If true, cancel on close
+	-- condition: Condition on which to close
+	-- Returns: Closure to close section
+	----------------------------------------------
+	CloseIf = function(S, bCancel, condition)
+		local close = S:Close(bCancel);
+		return function()
+			CallIf(condition(), close);
+		end
+	end,
+	
+	-- Gets the current focus
+	-- Returns: Focus handle
+	--------------------------
+	GetFocus = function(S)
+		return #S.focus > 0 and S.focus[S.current] or nil;
+	end,
+	
+	-- Checks whether an item is in the focus chain
+	-- item: Item handle
+	-- Returns: If true, it is in the focus chain
+	------------------------------------------------
+	IsFocusItem = function(S, item)
+		return table.find(S.focus, item) ~= nil;
+	end,
+		
+	-- Traps keyboard input to the section
+	-- action: Action to process
+	-- bPress: If true, there is a press
+	---------------------------------------
+	KeyTrap = function(S, action, bPress)
+		-- On tab presses, move the focus to the next item in the chain. 
+		if action == "tab" and bPress then
+			S:SetFocus("+");
+			
+		-- On escape presses, quit.
+		elseif action == "escape" and bPress then
+			Quit = true;
+
+		-- Otherwise, invoke the appropriate trap on the key.
+		elseif #S.focus > 0 then
+			S:GetFocus():Call("onKeyTrap", action, bPress);
+		end
+	end,
+	
+	-- Loads the focus chain
+	-- ...: Item handles
+	-------------------------
+	LoadFocusChain = function(S, ...)
+		-- Install the focus chain and give the first item focus.
+		S.focus, S.current = { ... }, 1;
+		W_CallIf(S.focus[1], "onFocus", true);
+	end,
+	
+	-- Sets the current focus
+	-- focus: Command or focus handle
+	----------------------------------
+	SetFocus = function(S, focus)
+		if not S.current then
+			return;
+		end
+		
+		-- If a command is passed instead of a name, get the item index.
+		if focus == "+" then
+			focus = S.current + 1;
+			if focus > #S.focus then
+				focus = 1;
+			end
+		
+		-- Otherwise, find the index of the new focus.	
+		else
+			focus = table.find(S.focus, focus);
+		end
+		
+		-- If the focus has switched, indicate that the old focus is lost, set the new
+		-- focus, then indicate that the new item has gained the focus.
+		if focus ~= S.current then
+			S:GetFocus():Call("onFocus", false);
+			S.current = focus;
+			S.focus[focus]:Call("onFocus", true);
+		end
+	end,
+	
+	-- Invokes a state switch
+	-- state: State to assign
+	--------------------------
+	Switch = function(S, state)
+		S:InvokeIf_("switch", state);
+	end
+}, 
+
+-- New
+-- load: Load routine
+-- switch: Switch routine
+--------------------------
+function(S, load, switch)
+	S.focus, S.switch = {}, switch;
+	S:Switch("Load");
+	load(S);
+	S:Switch("Normal");
+end);
+
+-----------------------------------
+-- Dialog
+-- Launches a dialog
+-- name: Section name
+-- ...: Arguments to entry routine
+-----------------------------------
+function Dialog (name, ...)
+	Launch(name, function()
+		-- Add a dummy pane to the frame to catch stray input.
+		Backdrop(true):Frame(0, 0, 1, 1);
+	end, function()
+		-- Destroy the dummy pane.
+		UI:GetFrameHead():Remove();
+	end, ...);
+end
+
+--------------------------
+-- LoadDialog
+-- Loads a dialog section
+-- name: Section name
+-- load: Load routine
+-- enter: Entry routine
+-- close: Close routine
+-- switch: Switch routine
+--------------------------
+function LoadDialog (name, load, enter, close, switch)
+	Load(name, load, enter, close, switch);
+end
+
+--------------------------
+-- LoadScreen
+-- Loads a screen section
+-- name: Section name
+-- load: Load routine
+-- enter: Entry routine
+-- switch: Switch routine
+--------------------------
+function LoadScreen (name, load, enter, switch)
+	Load(name, load, enter, nil, switch);
+end
+
+---------------------------
+-- Section
+-- Gets a section
+-- name: Section name
+-- Returns: Section handle
+---------------------------
+function Section (name)
+	return _Section[name];
+end
+
+-----------------------------------
+-- Screen
+-- Launches a screen
+-- name: Section name
+-- ...: Arguments to entry routine
+-----------------------------------
+function Screen (name, ...)
+	Launch(name, function()
+		-- Empty the stack.
+		table.foreach(_Stack, Pop);
+	end, function() end, ...);
+end
+
+-- Override the section variable.
+BindVariable("CurrentSection", function()
+	return table.top(_Stack).section;
+end, function() end);

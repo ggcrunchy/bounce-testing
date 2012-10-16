@@ -1,0 +1,27 @@
+-------------------------------------------------
+-- Backdrop class definition; inherits from Pane
+-------------------------------------------------
+class.define("Backdrop", {},
+
+-- New
+-- state: State handle
+-- bBlock: Blocking boolean
+----------------------------
+function(B, state, bBlock)
+	class.scons("Pane", state);
+
+	-- Methods --
+	B:SetMethod("signal", function(cx, cy, x, y, w, h)
+		B:InvokeIf(bBlock, "Signal");
+	end);
+end, { base = "Pane" });
+
+----------------------------
+-- Backdrop
+-- Backdrop setup procedure
+-- bBlock: Blocking boolean
+-- Returns: Backdrop handle
+----------------------------
+function Backdrop (bBlock)
+	return class.new("Backdrop", UI, bBlock);
+end

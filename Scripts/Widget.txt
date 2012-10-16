@@ -1,0 +1,354 @@
+--------------------------------------------------
+-- Widget class definition; inherits from Widget_
+--------------------------------------------------
+class.define("Widget", {
+	-- Assigns the given widget color
+	-- color: Color to apply
+	----------------------------------
+	ApplyColor = function(W, color)
+		Graphics.SetColor(Math.Vector(W:GetColor(color)));
+	end,
+
+	-- Calls the widget's method
+	-- type: Method type
+	-- ...: Arguments to method
+	-- Returns: Results of call
+	-----------------------------
+	Call = function(W, type, ...)
+		return CallIf_(W.methods[type], ...);
+	end,
+
+	-- Calls the widget's method if a condition holds
+	-- condition: Condition to test
+	-- type: Method type
+	-- ...: Arguments to method
+	-- Returns: Results of call
+	-----------------------------	
+	CallIf = function(W, condition, type, ...)
+		if condition then
+			return W:Call(type, ...);
+		end
+	end,
+
+	-- Builds an iterator up the dock chain
+	-- Returns: Iterator which returns widget handle
+	-------------------------------------------------
+	Chain = function(W)
+		return function(_, widget)
+			if widget then
+				return widget:GetParent();
+			end
+			return W;
+		end;		
+	end,
+	
+	-- Clips a point to the widget
+	-- xC, yC: Point coordinates
+	-- Returns: Clipped coordinates
+	--------------------------------
+	Clip = function(W, xC, yC)
+		local x, y, w, h = W:GetRect("xywh");
+		return ClampIn(xC, x, x + w - 1), ClampIn(yC, y, y + h - 1);
+	end,
+	
+	-- Docks the widget in a pane
+	-- pane: Pane handle
+	-- type: Type of dock to perform
+	-- x, y: Widget coordinates
+	-- w, h: Widget dimensions
+	---------------------------------
+	DockIn = function(W, pane, type, x, y, w, h)
+		-- Install the widget in the pane with global coordinates and dimensions equal
+		-- to those passed in as arguments.
+		if type == "Global" then
+			local px, py = pane:GetRect("xy");
+			x, y = x - px, y - py;
+
+		-- Install the widget in the pane body.
+		elseif type == "Body" then
+			pane = pane:GetBody();
+		end
+
+		-- Install the widget in the pane.
+		pane:Dock(W);
+		W:SetRect("xywh", x, y, w, h);
+
+		-- Invoke any dock event.
+		W:Call("onDock");
+	end,
+	
+	-- Draws a widget frame
+	-- frame: Frame to draw
+	-- x, y: Frame cooordinates
+	-- w, h: Frame dimensions
+	----------------------------
+	DrawFrame = function(W, frame, x, y, w, h)
+		W:ApplyColor("f_" .. frame);
+		Graphics.DrawBox(x, y, w, h, false);
+	end,
+	
+	-- Draws a specific picture from the widget
+	-- picture: Picture to draw
+	-- x, y: Picture coordinates
+	-- w, h: Picture dimensions
+	--------------------------------------------
+	DrawPicture = function(W, picture, x, y, w, h)
+		W:ApplyColor("p_" .. picture);
+		W.pictures[picture]:Draw(x, y, w, h);
+	end,
+
+	-- Invokes the widget event method
+	-- event: Event to process
+	-----------------------------------
+	Event = function(W, event)
+		W:Call("event", event);
+	end,
+
+	-- Gets the given widget color
+	-- color: Color type
+	-- Returns: Color components
+	-------------------------------
+	GetColor = function(W, color)
+		local color = W.colors[color] or {};
+		return color.r or 1, color.g or 1, color.b or 1;
+	end,
+
+	-- Gets the widget's local rectangle
+	-- Returns: Widget coordinates, dimensions
+	-------------------------------------------
+	GetLocalRect = function(W)
+		return W.x, W.y, W.w, W.h;
+	end,
+
+	-- Gets the widget's method
+	-- type: Method type
+	-- Returns: Widget method
+	----------------------------
+	GetMethod = function(W, type)
+		return W.methods[type];
+	end,
+
+	-- Gets the widget picture set
+	-- Returns: Widget picture set
+	-------------------------------
+	GetPictureSet = function(W)
+		return W.pictures;
+	end,
+
+	-- Gets the widget's absolute rectangle
+	-- format: Format string for return values
+	-- Returns: Widget coordinates, dimensions in format order
+	-----------------------------------------------------------
+	GetRect = function(W, format)
+		local x, y = 0, 0;
+		for widget in W:Chain() do
+			x, y = x + widget.x, y + widget.y;
+		end
+		
+		-- Return the desired fields.
+		local values, choices = {}, { x = x, y = y, w = W.w, h = W.h };
+		for which in format:gmatch(".") do
+			table.insert(values, choices[which]);
+		end
+		return unpack(values);
+	end,
+
+ 	-- Gets the widget string
+	-- Returns: Widget string
+	--------------------------
+	GetString = function(W)
+		return W.string or "";
+	end,
+
+	-- Gets the widget text set and offset
+	-- Returns: The widget text set and offset
+	-------------------------------------------
+	GetText = function(W)
+		return TextC[W.textSet], W.textOffset or 0;
+	end,
+	
+	-- Gets the widget's visible absolute rectangle
+	-- Returns: Visiblity boolean; view coordinates, dimensions if true
+	--------------------------------------------------------------------
+	GetViewRect = function(W)
+		local x, y, w, h = W:GetLocalRect();
+		for widget in W:Chain() do
+			-- If this is not the top of the chain, translate with respect to the parent.
+			-- Otherwise, base the calculations on the frame.
+			local parent, px, py, pw, ph = widget:GetParent();
+			if parent then
+				local vx, vy = parent:GetView();
+				x, y = x - vx, y - vy;
+
+				-- Get the parent dimensions.
+				px, py, pw, ph = parent:GetLocalRect();
+			else
+				px, py, pw, ph = 0, 0, vw, vh;
+			end
+
+			-- Map the region into the widget frame; quit if it goes out of view.
+			if x >= pw or x + w <= 0 or y >= ph or y + h <= 0 then
+				return false;
+			end
+	
+			-- Clamp the region as necessary. Compute the new region.
+			x, y = px + math.max(x, 0), py + math.max(y, 0);
+			w, h = math.min(px + pw, x + w) - x, math.min(py + ph, y + h) - y;
+		end
+		return true, x, y, w, h;
+	end,
+	
+	-- Indicates whether the widget is the focus
+	-- Returns: If true, it is the focus
+	---------------------------------------------
+	IsFocus = function(W)
+		return CurrentSection:GetFocus() == W;
+	end,
+	
+	-- Performs an action embedded between refreshes
+	-- action: Action to perform
+	-------------------------------------------------
+	RefreshAction = function(W, action)
+		W:Call("onRefresh", false);
+		CallIf_(action);
+		W:Call("onRefresh", true);
+	end,
+
+	-- Removes the widget
+	----------------------
+	Remove = function(W)
+		Tasks:Add(function()
+			W:Destroy();
+		end);
+	end,
+	
+	-- Sets the given widget color
+	-- color: Color to assign
+	-- r, g, b: Color components
+	-------------------------------
+	SetColor = function(W, color, r, g, b)
+		W.colors[color] = { r = r, g = g, b = b };
+	end,
+
+	-- Sets the widget's method
+	-- name: Method name
+	-- method: Method to assign
+	----------------------------
+	SetMethod = function(W, name, method)
+		table.copyto(type(name) == "table" and name or { [name] = method }, W.methods);
+	end,
+
+	-- Sets a specific picture in the widget
+	-- picture: Picture name
+	-- picture: Picture to assign
+	-----------------------------------------
+	SetPicture = function(W, name, picture)
+		table.copyto(type(name) == "table" and name or { [name] = picture }, W.pictures);
+	end,
+	
+	-- Sets the widget's local rectangle
+	-- format: Format string used to assign fields
+	-- ...: Coordinates, dimensions in format order
+	------------------------------------------------
+	SetRect = function(W, format, ...)
+		local index = 1;
+		for which in format:gmatch(".") do
+			W[which] = (select(index, ...));
+			index = index + 1;
+		end
+	end,
+	
+	-- Sets the widget string
+	-- string: String to assign
+	----------------------------
+	SetString = function(W, string)
+		W.string = string and tostring(string) or nil;
+	end,
+	
+	-- Sets the widget text set and offset
+	-- textset: Text set to assign
+	-- offset: Offset of text
+	---------------------------------------
+	SetText = function(W, textset, offset)
+		W.textSet, W.textOffset = textset, offset;
+	end,
+	
+	-- Invokes the widget signal test
+	-- x, y: Widget coordinates
+	-- w, h: Widget dimensions
+	----------------------------------
+	SignalTest = function(W, x, y, w, h)
+		local bValid, vx, vy, vw, vh = W:GetViewRect();
+		if bValid and PointInBox(cx, cy, vx, vy, vw, vh) then
+			W:Call("signal", cx, cy, x, y, w, h);
+		end
+	end,
+
+	-- Draws a formatted string
+	-- string: String to draw
+	-- options: Format options
+	-- x, y: Widget coordinates
+	-- w, h: Widget dimensions
+	----------------------------
+	StringF = function(W, string, options, x, y, w, h)
+		local textset, offset = W:GetText();
+		if textset then
+			W:ApplyColor("S");
+			local add, cw, ch = { x = 0, y = 0 }, textset:GetSize(string);
+			local features = {
+				h = { which = "x", amount = (w - cw) / 2, },
+				v = { which = "y", amount = (h - ch) / 2, },
+				o = { which = "x", amount = offset or 0 }
+			};
+			for what in options:gmatch(".") do
+				local choice = features[what];
+				if choice then
+					add[choice.which] = add[choice.which] + choice.amount;
+					features[what] = nil;
+				end
+			end
+			textset:DrawString(string, x + add.x, y + add.y);
+		end
+	end,
+			
+	-- Invokes the widget update method
+	-- x, y: Widget coordinates
+	-- w, h: Widget dimensions
+	------------------------------------
+	Update = function(W, x, y, w, h)
+		local bValid, vx, vy, vw, vh = W:GetViewRect();
+		if bValid then
+			Graphics.SetBounds(vx, vy, vw, vh);
+			W:Call("update", x, y, w, h);
+		end
+	end
+},
+
+-- New
+-- state: State handle
+-----------------------
+function(W, state)
+	class.scons("Widget_", state);
+
+	-- Allocate parameters.
+	W.colors, W.methods, W.pictures = {}, {}, {};
+
+	-- Methods --
+	W:SetMethod("signal", function(cx, cy, x, y, w, h)
+		W:InvokeIf(PointInBox(cx, cy, x, y, w, h), "Signal");
+	end);
+end, { base = "Widget_" });
+
+-------------------------------------
+-- W_CallIf
+-- Calls a method if a widget exists
+-- W: Widget handle
+-- method: Name of method to call
+-- ...: Arguments to routine
+-- Returns: Results of call
+-------------------------------------
+function W_CallIf (W, method, ...)
+	if W then
+		return W:Call(method, ...);
+	end
+end

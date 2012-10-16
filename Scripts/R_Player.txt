@@ -1,0 +1,149 @@
+-----------------------------
+-- Seek
+-- Seeks toward a target
+-- direction: Seek direction
+-- player: Player handle
+-----------------------------
+local function Seek (direction, player)
+	local scale = player:GetProperty("MaxSpeed") * math.min(Vec.TLen(direction) / player:GetProperty("ApproachRange"), 1);
+	return "seek", Vec.ScaleTo(Vec.xz(direction), scale) - player:GetMotion();
+end
+
+-------------------------------------
+-- Player_Flanker
+-- Flanker state routine
+-- player: Player handle
+-- transition: State transition
+-- Returns: Target method, direction
+-------------------------------------
+function Player_Flanker (player, transition)
+	if transition == "enter" then
+		player:EnableTargetForce(function()
+			local leader = player:GetTeam():GetLeader();
+			local radius, heading, side = leader:GetRadius(), player:GetPursuitOffsets();
+			local diff = leader:GetWorldPosition(heading, side, 0) * radius
+					   + leader:GetMotion() * .1
+					   - player:GetPosition();
+			if Vec.TLen(diff) > player:GetRadius() then
+				return Seek(diff, player);
+			end
+			player:GetTeam():Alert("done", player);
+		end);
+		player:EnableGroupForces(false, true, true);
+	elseif transition == "exit" then
+		player:EnableTargetForce(nil);
+		player:EnableGroupForces(false, false, false);
+		player:SetMotion(Math.v0());
+	else
+
+	end
+end
+
+------------------------------------
+-- Player_Player
+-- Player/player material handler
+-- player1, player2: Player handles
+-- time: Time of collision
+-- contact: Contact point
+------------------------------------
+function Player_Player (player1, player2, time, contact, normal)
+	Deflect(player1, player2, .9, .001);
+end
+
+-------------------------------------
+-- Player_ReturnHome
+-- Return home state routine
+-- player: Player handle
+-- transition: State transition
+-- Returns: Target method, direction
+-------------------------------------
+function Player_ReturnHome (player, transition)
+	if transition == "enter" then
+		local x, z = GetXZ(player:GetHomeCell());
+		player:EnableTargetForce(function()
+			local diff = Math.vXZ(x, z) - player:GetPosition();
+			if Vec.TLen(diff) > player:GetRadius() then
+				return Seek(diff, player);
+			end
+			player:GetTeam():Alert("home", player);
+		end);
+		player:EnableGroupForces(false, false, true);
+	elseif transition == "exit" then
+		player:EnableTargetForce(nil);
+		player:EnableGroupForces(false, false, false);
+		player:SetMotion(Math.v0());
+	else
+
+	end
+end
+
+-------------------------------------
+-- Player_Shooter
+-- Shooter state routine
+-- player: Player handle
+-- transition: State transition
+-- Returns: Target method, direction
+-------------------------------------
+function Player_Shooter (player, transition)
+	if transition == "enter" then 
+		player:EnableTargetForce(function()
+			local ball = c_objects:GetElement("Ball", 1);
+			local h, what = player:GetTeam():GetCollection():GetElement("heights", 3), "height3";
+			local sin = (h - player:GetRadius()) / player:GetRadius();
+			local cos, final = math.sqrt(1 - sin^2) * (player:GetRadius() + ball:GetRadius());
+
+			--
+			for state in player:GetTeam():GetCollection():Iter(what) do
+				local diff = state.position
+						   - player:GetPosition();
+				if Vec.TLen(state.velocity) > 0 then
+					diff = diff + Vec.ScaleTo(Vec.xz(state.velocity), cos);
+				end
+				if state.time * player:GetProperty("MaxSpeed") > Vec.TLen(diff) then
+player.DIFF = diff;
+					return Seek(diff, player);
+				end
+				final = state;
+			end
+
+			--
+			if final then
+				local v, pb = Vec.xz(final.velocity), player:GetPosition() - final.position;
+				local t = Math.BQF(v * v - player:GetProperty("MaxSpeed")^2, -v * pb, pb * pb);
+				if t then
+--printf("t = %f", t)
+					local diff = ball:GetPosition() + v * t - player:GetPosition()
+player.DIFF = diff;
+					return Seek(diff, player);
+				end
+			end
+
+			--
+			-- do something else
+local diff = ball:GetPosition() - player:GetPosition()
+player.DIFF = diff;
+			return Seek(diff, player)
+		--	player:GetTeam():Alert("done", player);
+		end);
+		player:EnableGroupForces(false, false, true);
+	elseif transition == "exit" then
+		player:EnableTargetForce(nil);
+		player:EnableGroupForces(false, false, false);
+		player:SetMotion(Math.v0());
+	else
+
+	end
+end
+
+--------------------------------------
+-- Player_SolidWall
+-- Player/solid wall material handler
+-- player: Player handle
+-- wall: Unused
+-- time: Time of collision
+-- contact: Contact point
+-- normal: Contact normal
+--------------------------------------
+function Player_SolidWall (player, wall, time, contact, normal)
+	Bounce(player, normal, 0, .9, .01);
+end

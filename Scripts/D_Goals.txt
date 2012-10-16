@@ -1,0 +1,69 @@
+-- Install the goals dialog.
+LoadDialog("Goals",
+	-- Load --
+	function(s)
+		----------------
+		-- Installation
+		----------------
+		s.Pane = Title("Goals", .15, false);
+		s.Goal = Radiobox(.35, .9, false);
+		s.Height = SliderHorz(.1, .9, .5, .1, .8);
+		for index = 1, 2 do
+			s["Text" .. index] = StaticText(index, false, "T18", 0);		
+		end
+			
+		-----------
+		-- Docking
+		-----------
+		s.Goal:DockIn(s.Pane, "Body", .05, .05, .2, .1);
+		OK(s):DockIn(s.Pane, "Body", .05, .7, .25, .2);
+		s.Height:DockIn(s.Pane, "Body", .4, .05, .5, .1);
+		for index = 1, 2 do
+			s["Text" .. index]:DockIn(s.Pane, "Body", -.025 + index * .1, .175, .075, .2);
+		end
+		
+		--------------------------
+		-- Loading: goal radiobox
+		--------------------------
+		for index = 1, 2 do
+			s.Goal:AddOption(.5 * index - .3, .5);
+		end
+		
+		-- Refresh --
+		s.Goal:SetMethod("onRefresh", function(bNew)
+			if bNew then
+				s.Height:SetOffset(c_objects:GetElement("Goal", s.Goal:GetChoice()):GetPosition().y / 15);
+			end
+		end);
+		
+		-------------------
+		-- Loading: slider
+		-------------------
+		-- Refresh --
+		s.Height:SetMethod("onRefresh", function(bNew)
+			if bNew then
+				local goal = c_objects:GetElement("Goal", s.Goal:GetChoice());
+				local column, row = goal:GetCell();
+				c_objects:AddElement(s.Goal:GetChoice(), class.new("Goal", column, row, s.Height:GetOffset() * 15, goal:GetRadius()));
+			end
+		end);
+
+		-----------------------------
+		-- Loading: goal static text
+		-----------------------------
+		for index, color in ipairs{
+			{ 1, 0, 0 }, { 0, 0, 1 }
+		} do
+			s["Text" .. index]:SetColor("S", unpack(color));
+		end
+	end,
+	
+	-- Entry
+	---------
+	function(s)
+		s.Pane:Frame(0, 0, .6, .6);
+
+		-- Set the slider offset.
+		s.Height:SetOffset(c_objects:GetElement("Goal", s.Goal:GetChoice()):GetPosition().y / 15);	
+	end
+);

@@ -1,0 +1,137 @@
+----------------------------------------------------
+-- Player class definition; inherits from Steerable
+----------------------------------------------------
+class.define("Player", {
+	-- Computes player forces
+	-- step: Time step
+	-- objects: Object collection handle
+	-- walls: Wall collection handle
+	-------------------------------------
+	ComputeForce = function(P, step, objects, walls)
+		-- Collect the player's neighbors, excluding non-player or distant objects.
+		local neighbors, where, range = {}, P:GetPosition(), P:GetProperty("NeighborRange");
+		for object in objects:Iter("Player") do
+			if object ~= P and #(object:GetPosition() - where) < range then
+				table.insert(neighbors, object);
+			end
+		end
+
+		-- Collect the walls the player can reach in this step.
+		local obstacles = {};
+		for wall in walls:Iter("solidwall", P, step) do
+			table.insert(obstacles, wall);
+		end
+		P.force = P:GetForce(neighbors, obstacles)-- + Math.vY(-gravity);
+	end,
+
+	-- Draws the player
+	--------------------
+	Draw = function(P)
+		Graphics.DrawSphere(P.position, P.radius, 32, 32);
+	end,
+
+	-- Gets the player heading
+	-- Returns: Player heading
+	---------------------------
+	GetHeading = function(P)
+		return Vec.Copy(P.heading or Math.vXZ(0, 1));
+	end,
+
+	-- Gets the home cell
+	-- Returns: Home column, row
+	-----------------------------
+	GetHomeCell = function(P)
+		return P.column, P.row;
+	end,
+
+	-- Gets the player's pursuit offsets
+	-- Returns: Relative position along heading, to side
+	-----------------------------------------------------
+	GetPursuitOffsets = function(P)
+		return P.headingO, P.sideO;
+	end,
+
+	-- Gets the player side vector
+	-- Returns: Player side vector
+	-------------------------------
+	GetSide = function(P)
+		return P.heading and Math.vXZ(P.heading.z, -P.heading.x) or Math.vXZ(1, 0);
+	end,
+
+	-- Gets the team to which the player belongs
+	-- Returns: Team handle
+	---------------------------------------------
+	GetTeam = function(P)
+		return P.team;
+	end,
+
+	-- Gets the player up vector
+	-- Returns: Player up vector
+	-----------------------------
+	GetUp = function(P)
+		return Math.vY(1);
+	end,
+
+	-- Loads the player state
+	-- state: State to load
+	--------------------------
+	LoadState = function(P, state)
+		P:SetMotion(state.motion);
+		P.position = Vec.Copy(state.position);
+	end,
+
+	-- Saves the player state
+	-- Returns: Saved state
+	--------------------------
+	SaveState = function(P)
+		return {
+			motion = P:GetMotion(),
+			position = P:GetPosition()
+		};
+	end,
+
+	-- Sets the home cell
+	-- column, row: Column, row indices
+	------------------------------------
+	SetHomeCell = function(P, column, row)
+		P.column, P.row = column, row;
+	end,
+
+	-- Sets the player motion
+	-- motion: Motion vector
+	--------------------------
+	SetMotion = function(P, motion)
+		P.motion = Vec.Copy(motion);
+
+		-- Orient the player in the XZ-plane component of motion, if possible.
+		P.heading = Vec.UnitF(motion.x, 0, Vec.TLen(motion) > 0 and motion.z or 1);
+	end,
+
+	-- Sets the player's pursuit offsets
+	-- heading: Relative position along heading
+	-- side: Relative position to side
+	--------------------------------------------
+	SetPursuitOffsets = function(P, heading, side)
+		P.headingO, P.sideO = heading, side;
+	end,
+
+	-- Assigns the player to a team
+	-- team: Team handle
+	--------------------------------
+	SetTeam = function(P, team)
+		P.team = team;
+	end
+}, 
+
+-- New
+-- column, row: Home indices
+-- h: Home height
+-- radius: Player radius
+-- property: Property table
+-----------------------------
+function(P, column, row, h, radius)
+	class.scons("Steerable");
+	P:SetHomeCell(column, row);
+	local x, z = GetXZ(column, row);
+	P.position, P.radius = Math.Vector(x, h, z), radius;
+end, { base = "Steerable" });

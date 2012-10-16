@@ -1,0 +1,257 @@
+----------------------
+-- Update method sets
+----------------------
+local _Alert, _Enter, _General, _Leave, _Off, _On = {}, {}, {}, {}, {}, {};
+
+-----------------
+-- Update timers
+-----------------
+local _Timers = {};
+
+-----------------------------------------
+-- AssignMethods
+-- Assigns update methods
+-- team: Team handle
+-- general, alert: General, alert method
+-- enter, on: Enter, on method
+-- leave, off: Leave, off method
+-----------------------------------------
+local function AssignMethods (team, general, alert, enter, on, leave, off)
+	_General[team] = general;
+	_Alert[team] = alert;
+	_Enter[team], _On[team] = enter, on;
+	_Leave[team], _Off[team] = leave, off;
+end
+
+-------------------------------
+-- ChoosePlayer
+-- Chooses an available player
+-- free: Set of free players
+-- best: Rating function
+-- ...: Extra rating input
+-- Returns: Player handle
+-------------------------------
+local function ChoosePlayer (free, best, ...)
+	-- Rate each player: if one is better than the current optimum, set it as the current
+	-- choice and update the optimum.
+	local choice, optimum;
+	for player in pairs(free) do
+		local measure = best(player, optimum, ...);
+		if measure then
+			choice, optimum = player, measure;
+		end
+	end
+	return choice;
+end
+
+-------------------------------
+-- Flanker_Best
+-- Rates a player as a flanker
+-- player: Player to rate
+-- optimum: Current optimum
+-- ...: Heading, side distance
+-------------------------------
+local function Flanker_Best (player, optimum, ...)
+	-- Find the player closest to the leader's given flank position.
+	local leader, heading, side = player:GetTeam():GetLeader(), ...;
+	local measure = Vec.TLen(leader:GetWorldPosition(heading, side, 0) * leader:GetRadius() +	
+							 leader:GetMotion() * .1 -
+							 player:GetPosition());
+	if not optimum or measure < optimum then
+		return measure;
+	end
+end
+
+-------------------------------
+-- Shooter_Best
+-- Rates a player as a shooter
+-- player: Player to rate
+-- optimum: Current optimum
+-------------------------------
+local function Shooter_Best (player, optimum)
+	-- Find the available player closest to the ball.
+	local ball = c_objects:GetElement("Ball", 1);
+	local measure = Vec.TLen(player:GetPosition() -
+							 ball:GetPosition());
+	if player:GetState() == Player_Shooter then
+		measure = measure * .625;
+	end
+	if not optimum or measure < optimum then
+		return measure;
+	end
+end
+
+-------------------------------------------------
+-- Team_AlertInPlay
+-- General team alerts while the ball is in play
+-- team: Team handle
+-- message: Alert message
+-- ...: Alert arguments
+-------------------------------------------------
+local function Team_AlertInPlay (team, message, ...)
+	if message == "done" then
+		select(1, ...):SetState();
+	elseif message == "home" then
+		select(1, ...):SetState();
+	end
+end
+
+-----------------------------------------------------
+-- Team_EnterInPlay
+-- General team update while the ball enters in play
+-- team: Team handle
+-----------------------------------------------------
+local function Team_EnterInPlay (team)
+	_Timers[team] = class.new("Timer", function()
+		-- Set up a list of the free players.
+		local free = {};
+		for player in team:Iter() do
+			free[player] = true;
+		end
+
+		---------------------------
+		-- Pick
+		-- Picks the best player
+		-- best: Best routine
+		-- state: State to assign
+		-- ...: Extra rating input
+		---------------------------
+		local function Pick (best, state, ...)
+			local player = ChoosePlayer(free, best, ...);
+			free[player] = nil;
+			player:SetState(state);
+			return player;		
+		end
+
+		-- Choose players for various roles. Send the remainder home.
+		team:SetLeader(Pick(Shooter_Best, Player_Shooter));
+		for _, flank in ipairs{
+			{ heading = -3, side = -3.5 },
+			{ heading = -3, side = 3.5 }
+		} do
+			Pick(Flanker_Best, Player_Flanker, flank.heading, flank.side):SetPursuitOffsets(flank.heading, flank.side);
+		end
+		for player in pairs(free) do
+			player:SetState(Player_ReturnHome);
+		end
+	end, 400);
+	_Timers[team]:Update(true);
+end
+
+-------------------------------------------------
+-- Team_GeneralInPlay
+-- General team update while the ball is in play
+-- team: Team handle
+-------------------------------------------------
+local function Team_GeneralInPlay (team)
+	local ball = c_objects:GetElement("Ball", 1);
+	local path, y, time = ball:GetPath(), ball:GetPosition().y - ball:GetRadius();
+	local state = path[1];
+
+	-- Determine how long the ball already spent in the first arc. This will be the minimum time.
+	if state then
+		time = -Trajectory.GetTime(Vec.TLen(ball:GetPosition() - state.position), #state.motion, Vec.Angle(state.motion));
+	end
+
+	-- Clear the data for each height of interest.
+	local heights = team:GetCollection():Pack("heights");
+	for index = 1, #heights do
+		team:GetCollection():Clear(string.format("height%i", index));
+	end
+
+	-- Run through the arcs. Determine the timespan needed to cover each arc, and when in
+	-- this span the arc reaches the heights of interest, ignoring any before the minimum
+	-- time. Tabulate each of these found on the team's side.
+	for index = 1, #path - 1 do
+		local next, speed, incline = path[index + 1], #state.motion, Vec.Angle(state.motion);
+		local diff = next.position - state.position;
+		local span = Trajectory.GetTime(Vec.TLen(diff), speed, incline);
+		for which, h in ipairs(heights) do
+			for _, t in ipairs{ Trajectory.GetYTimes(h - y, speed, incline, gravity) } do
+				if t > -time and t < span then
+					local position = Trajectory.GetPosition(state.position, next.position, speed, incline, gravity, t);
+					if team:GetSide(position) then
+						team:GetCollection():AddElement(nil, {
+							position = position,
+							time = time + t,
+							velocity = Trajectory.GetVelocity(state.position, next.position, speed, incline, gravity, t)
+						}, string.format("height%i", which));
+					end
+				end
+			end
+		end
+
+		-- Go to the next arc. Advance the time by the span of the current arc. Elevate
+		-- the starting height.
+		time, y, state = time + span, y + diff.y, next;
+	end
+end
+
+-----------------------------------------------------
+-- Team_LeaveInPlay
+-- General team update while the ball leaves in play
+-- team: Team handle
+-----------------------------------------------------
+local function Team_LeaveInPlay (team)
+	-- If the ball leaves the team's side, direct the players back to their posts.
+	for player in team:Iter() do
+		player:SetState(Player_ReturnHome);
+	end
+
+	--
+
+end
+
+---------------------------------------------------------------
+-- Team_OffInPlay
+-- General team update while the ball is off this side in play
+-- team: Team handle
+---------------------------------------------------------------
+local function Team_OffInPlay (team)
+
+end
+
+--------------------------------------------------------------
+-- Team_OnInPlay
+-- General team update while the ball is on this side in play
+-- team: Team handle
+--------------------------------------------------------------
+local function Team_OnInPlay (team)
+	-- Periodically update the players' behaviors.
+	_Timers[team]:Update();
+end
+
+-------------------------
+-- Team_Update
+-- Updates the team
+-- team: Team handle
+-- state: Update state
+-- ...: Update arguments
+-------------------------
+function Team_Update (team, state, ...)
+	if state == "enter" then
+		AssignMethods(team, Team_GeneralInPlay,
+							Team_AlertInPlay,
+							Team_EnterInPlay, Team_OnInPlay,
+							Team_LeaveInPlay, Team_OffInPlay);
+	elseif state == "exit" then
+		
+	elseif state == "update" then
+		local ball = c_objects:GetElement("Ball", 1);
+		local bOnSide = team:GetSide(ball:GetPosition());
+
+		-- Invoke general updates.
+		_General[team](team);
+
+		-- Handle side switches.
+		if bOnSide ~= team:GetPossession() then
+			CallIf_((bOnSide and _Enter or _Leave)[team], team);
+		end
+
+		-- Perform regular side-based update.
+		CallIf_((bOnSide and _On or _Off)[team], team);
+		team:SetPossession(bOnSide);
+	else
+		CallIf_(_Alert[team], team, state:sub(3), ...);
+	end
+end

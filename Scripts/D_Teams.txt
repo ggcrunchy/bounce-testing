@@ -1,0 +1,161 @@
+-- Install the teams dialog.
+LoadDialog("Teams",
+	-- Load --
+	function(s)
+		----------------
+		-- Installation
+		----------------
+		s.Pane = Title("Teams", 36, false);
+		s.Grid = Grid(function(column, row)
+			local index, team, player = s.Grid:Index(column, row), s.Team:GetChoice(), s.Player:GetChoice();
+			if not s.Grid:InUse(column, row) then
+				teams[team]:GetPlayer(player):SetHomeCell(column, row);
+			end
+		end, function(column, row)
+			for team = 1, 2 do
+				for player = 1, 5 do
+					local pc, pr = teams[team]:GetPlayer(player):GetHomeCell();
+					if column == pc and row == pr then
+						return { team = team, player = player };
+					end
+				end
+			end
+		end, function(column, row, data, x, y, w, h)
+			s["TText" .. data.team]:ApplyColor("S");
+			Graphics.DrawBox(x, y, w, h, true);
+			s["PText" .. data.player]:ApplyColor("S");
+			Graphics.DrawBox(x + w / 4, y + h / 4, w / 2, h / 2, true);
+			s.Grid:ApplyColor("C");
+			Graphics.DrawBox(x + w / 4, y + h / 4, w / 2, h / 2, false);
+		end);
+		s.Team = Radiobox(26, 26, false);
+		s.Player = Radiobox(26, 26, false);
+		for index = 1, 2 do
+			s["TText" .. index] = StaticText(index, false, "T18", 0);
+		end
+		for index = 1, 5 do
+			s["PText" .. index] = StaticText(index, false, "T18", 0);		
+		end
+
+		-----------
+		-- Docking
+		-----------
+		s.Team:DockIn(s.Pane, "Body", 19, 5, 76, 29);
+		s.Player:DockIn(s.Pane, "Body", 154, 5, 192, 29);
+		local col = SpacedColumn(0, 19, 60, 106, 58);
+			PushButton("Save", function()
+if true then return end
+				local file = io.open("Scripts/C_Teams.txt", "wt");
+				if file then
+					file:write("-- Player configuration data.\n");
+					file:write("config = {\n");
+					for index, team in ipairs(teams) do
+						fprintf(file, "%s{ -- Team %i --", index == 1 and "\t" or "", index);
+						for player in team:Iter() do
+							file:write(team:GetPlayerSpot(player) > 1 and ", " or "\t\t");
+							fprintf(file, "{ -- Player %i --", team:GetPlayerSpot(player));
+								local bPlayer1 = true;
+								for name, property, first, last in player:Properties() do
+									file:write(not bPlayer1 and ", " or "\t\t\t");
+									file:write(name .. " = {\n");
+									fprintf(file, "%s%s%s", property and string.format("\t\t\t\tproperty = %f%s", property, (first or last) and ",\n" or "") or "",
+															first and string.format("\t\t\t\tfirst = %f%s", first, last and ",\n" or "") or "",
+															last and string.format("\t\t\t\tlast = %f", last) or "");
+									file:write("\t\t\t}");
+									bPlayer1 = false;
+								end
+-- Player collections:
+-- hitlevels, etc.								
+							file:write("\n\t\t}");
+						end
+-- Collections:
+-- angles, speeds, etc.
+-- shots, etc.
+						file:write("\n\t}" .. (index < #teams and ", " or ""));
+					end
+					file:write("\n};");
+					file:close();
+				end
+			end):DockIn(s.Pane, "Body", col());
+			PushButton("Player", function()
+				Dialog("Player", teams[s.Team:GetChoice()]:GetPlayer(s.Player:GetChoice()));
+			end):DockIn(s.Pane, "Body", col());
+			OK(s):DockIn(s.Pane, "Body", col());
+		s.Grid:DockIn(s.Pane, "Body", 154, 60, 192, 172);
+		for index = 1, 2 do
+			s["TText" .. index]:DockIn(s.Pane, "Body", -12 + index * 40, 35, 48, 24);
+		end
+		for index = 1, 5 do
+			s["PText" .. index]:DockIn(s.Pane, "Body", 134 + index * 37, 35, 48, 24);		
+		end
+	
+		------------------------------------
+		-- Loading: team, player radioboxes
+		------------------------------------
+		for index = 1, 2 do
+			s.Team:AddOption(index * 39 - 37, 0);
+		end
+		for index = 1, 5 do
+			s.Player:AddOption(index * 37 - 29, 0);
+		end
+	
+		--------------------------------------
+		-- Loading: team, player static texts
+		--------------------------------------
+		for index, color in ipairs{
+			{ 1, 0, 0 }, { 0, 0, 1 }
+		} do
+			s["TText" .. index]:SetColor("S", unpack(color));
+		end
+		for index, color in ipairs{
+			{ 1, 0, 1 }, { 0, 1, 1 }, { 1, 1, 0 }, { .5, 1, .5 }, { 1, 0, .5 }
+		} do
+			s["PText" .. index]:SetColor("S", unpack(color));
+		end
+	end,
+	
+	-- Entry
+	---------
+	function(s)
+		s.Pane:Frame(0, 0, 384, 288);
+		s.Grid:SetCuts(hCuts, vCuts);
+	end
+);
+
+------------------------
+-- Configures a player
+-- P: Player handle
+-- team: Team index
+-- player: Player index
+------------------------
+function ConfigurePlayer (P, team, player)
+	for key, value in pairs(config[team][player] or {}) do
+		if key:sub(1, 2) == "c_" then
+			for _, element in ipairs(value) do
+				player:GetCollection():AddElement(nil, element, key:sub(3));
+			end
+		else
+			P:SetProperty(key, value.property);
+			P:SetRange(key, value.first, value.last);
+		end
+	end
+end
+
+---------------------
+-- Configures a team
+-- T: Team handle
+-- team: Team index
+---------------------
+function ConfigureTeam (T, team)
+	for key, value in pairs(config[team] or {}) do
+		if type(key) == "string" then
+			if key:sub(1, 2) == "c_" then
+				for _, element in ipairs(value) do
+					T:GetCollection():AddElement(nil, element, key:sub(3));
+				end
+			else
+				T:SetField(key, value);
+			end
+		end
+	end
+end

@@ -1,0 +1,120 @@
+-- Player configuration data.
+config = {
+	{ -- Team 1 --
+		c_angles = { .075, .2, .3, .45 },
+		c_speeds = { .7, .9, 1, 1.2 },
+		c_heights = { .25, .5, .75 },
+		c_shots = { 21, 23, 25 },
+		{ -- Player 1 --
+			NeighborRange = {
+				property = 0.489796,
+				first = 0.000000,
+				last = 1.000000
+			}, MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}, { -- Player 2 --
+			MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}, { -- Player 3 --
+			MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}, { -- Player 4 --
+			MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}, { -- Player 5 --
+			MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}
+	}, { -- Team 2 --
+		c_angles = { .075, .2, .3, .45 },
+		c_speeds = { .7, .9, 1, 1.2 },
+		c_heights = { .25, .5, .75 },
+		c_shots = { 1, 3, 5 },
+		{ -- Player 1 --
+			MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}, { -- Player 2 --
+			MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}, { -- Player 3 --
+			MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}, { -- Player 4 --
+			MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}, { -- Player 5 --
+			MaxSpeed = {
+				property = 4.000000,
+				first = 0.000000,
+				last = 10.000000
+			}, ApproachRange = {
+				property = 5.000000,
+				first = 0.000000,
+				last = 10.000000
+			}
+		}
+	}
+};

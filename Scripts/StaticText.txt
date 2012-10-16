@@ -1,0 +1,39 @@
+-----------------------------------------------------
+-- StaticText class definition; inherits from Widget
+-----------------------------------------------------
+class.define("StaticText", {},
+
+-- New
+-- state: State handle
+-- bFrame: Frame boolean
+-------------------------
+function(S, state, bFrame)
+	class.scons("Widget", state);
+
+	-- Assign frame property.
+	S.bFrame = bFrame;
+
+	-- Methods --
+	S:SetMethod("update", function(x, y, w, h)
+		S:StringF(S:GetString(), "vo", x, y, w, h);
+			
+		-- If requested, frame the text.
+		S:InvokeIf(S.bFrame, "DrawFrame", "D", x, y, w, h);
+	end);
+end, { base = "Widget" });
+
+------------------------------------
+-- StaticText
+-- Static text setup procedure
+-- string: String to assign to text
+-- bFrame: Frame boolean
+-- textset: Text set to use
+-- offset: Text offset
+-- Returns: Static text handle
+------------------------------------
+function StaticText (string, bFrame, textset, offset)
+	local S = class.new("StaticText", UI, bFrame);
+		S:SetText(textset, offset);
+		S:SetString(string);
+	return S;
+end

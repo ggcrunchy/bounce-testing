@@ -1,0 +1,153 @@
+---------------------------
+-- Object class definition
+---------------------------
+class.define("Object", {
+	-- Adds current state to path
+	-- bClose: If true, close the path
+	-----------------------------------
+	AddToPath = function(O, bClose)
+		-- If there are no intermediate steps, start a new path. Cache the current state.
+		O.pathdata = O.pathdata or {};
+		table.insert(O.pathdata, O:SaveState());
+		
+		-- On a close request, register the path and dump the intermediate steps.
+		if bClose then
+			O.path, O.pathdata = O.pathdata;
+		end
+	end,
+
+	-- Applies force to the object
+	-- step: Time step
+	-------------------------------
+	ApplyForce = function(O, step)
+		if O.force then
+			O:SetMotion(O:GetMotion() + O.force * step);
+		end
+	end,
+
+	-- Computes forces on the object
+	-- step, objects, walls: Unused
+	---------------------------------
+	ComputeForce = function(O, step, objects, walls)
+	end,
+
+	-- Gets the object's collection
+	-- Returns: Collection handle
+	--------------------------------
+	GetCollection = function(O)
+		return O.collection;
+	end,
+
+	-- Gets a given object field
+	-- key: Field key
+	-- Returns: Field value
+	-----------------------------
+	GetField = function(O, key)
+		return O.fields[key];
+	end,
+
+	-- Gets the object motion
+	-- Returns: Object motion
+	--------------------------
+	GetMotion = function(O)
+		return Vec.Copy(O.motion or Math.v0());
+	end,
+
+	-- Gets the object path
+	-- Returns: Object path
+	------------------------
+	GetPath = function(O)
+		return O.path or {};
+	end,
+
+	-- Gets the path state
+	-- Returns: If true, path is being built
+	-----------------------------------------
+	GetPathState = function(O)
+		return O.pathdata ~= nil;
+	end,
+
+	-- Gets the object position
+	-- Returns: Object position
+	----------------------------
+	GetPosition = function(O)
+		return Vec.Copy(O.position or Math.v0());
+	end,
+
+	-- Gets the object radius
+	-- Returns: object radius
+	--------------------------
+	GetRadius = function(O)
+		return O.radius or 0;
+	end,
+
+	-- Gets the object sphere
+	-- Returns: Object sphere
+	--------------------------
+	GetSphere = function(O)
+		return Math.Sphere(O:GetPosition(), O:GetRadius());
+	end,
+
+	-- Gets the object state
+	-- Returns: Object state
+	-------------------------
+	GetState = function(O)
+		return O.state;
+	end,
+
+	-- Gets the world position of a point local to the object
+	-- heading, side, up: Coordinates of point
+	-- Returns: Vector in world coordinates
+	----------------------------------------------------------
+	GetWorldPosition = function(O, heading, side, up)
+		return O:GetPosition() + O:GetHeading() * heading + O:GetSide() * side + O:GetUp() * up;
+	end,
+
+	-- Updates object position
+	-- step: Time step
+	-- direction: If specified, direction of motion
+	------------------------------------------------
+	Move = function(O, step, direction)
+		O.position = O:GetPosition() + (direction or O:GetMotion()) * step;
+	end,
+
+	-- Assigns a given object field
+	-- key, value: Field key, value
+	--------------------------------
+	SetField = function(O, key, value)
+		O.fields[key] = value;
+	end,
+
+	-- Sets the object motion
+	-- motion: Motion vector
+	--------------------------
+	SetMotion = function(O, motion)
+		O.motion = Vec.Copy(motion);
+	end,
+
+	-- Sets the object state
+	-- state: State to assign
+	--------------------------
+	SetState = function(O, state)
+		if O.state ~= state then
+			-- Exit the object state, if any.
+			O:InvokeIf_("state", "exit");
+		
+			-- Enter the new state, if any.
+			O.state = state;
+			O:InvokeIf_("state", "enter");
+		end
+	end,
+	
+	-- Updates the object
+	----------------------
+	Update = function(O)
+		O:InvokeIf_("state");
+	end
+},
+
+-- New
+-------
+function(O)
+	O.collection, O.fields = class.new("Collection"), {};
+end);

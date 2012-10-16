@@ -1,0 +1,88 @@
+-----------------------------------------------------
+-- PushButton class definition; inherits from Widget
+-----------------------------------------------------
+class.define("PushButton", {
+	-- Assigns the button action
+	-- action: Push button action
+	------------------------------
+	SetAction = function(P, action)
+		P.action = action;
+	end
+},
+
+-- New
+-- state: State handle
+-----------------------
+function(P, state)
+	class.scons("Widget", state);
+	P:SetMethod{
+		event = function(event)
+			CallIf(P.action and event == WE.Drop and P:IsEntered(), P.action);
+		end,
+		update = function(x, y, w, h)
+			-- Draw the button graphic.
+			local picture, bG, bE = "D", P:IsGrabbed(), P:IsEntered();
+			if bG and bE then
+				picture = "G";
+			elseif bG or bE then
+				picture = "E";
+			end
+			P:DrawPicture(picture, x, y, w, h);
+						
+			-- Draw the button's string.
+			P:StringF(P:GetString(), "hv", x, y, w, h);
+		end
+	};
+end, { base = "Widget" });
+
+----------------------------------------
+-- Cancel
+-- Builds a Cancel button
+-- section: Section cancelled by button
+-- Returns: Push button handle
+----------------------------------------
+function Cancel (section)
+	return PushButton("Cancel", section:Close(true));
+end
+
+-------------------------------
+-- Minimize
+-- Builds a minimize button
+-- pane: Pane handle
+-- Returns: Push button handle
+-------------------------------
+function Minimize (pane)
+	return PushButton("-", function()
+		pane:Minimize();
+	end);
+end
+
+-------------------------------------
+-- OK
+-- Builds an OK button
+-- section: Section exited by button
+-- Returns: Push button handle
+-------------------------------------
+function OK (section)
+	return PushButton("OK", section:Close(false));
+end
+
+--------------------------------------
+-- PushButton
+-- Push button setup procedure
+-- string: String to assign to button
+-- action: Push button action
+-- Returns: Push button handle
+--------------------------------------
+function PushButton (string, action)
+	local P = class.new("PushButton", UI);
+		P:SetAction(action);
+		P:SetPicture{
+			D = PictureC.B_n,
+			E = PictureC.B_e,
+			G = PictureC.B_g
+		};
+		P:SetText("T24", 5);
+		P:SetString(string);
+	return P;
+end

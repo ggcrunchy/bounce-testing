@@ -1,0 +1,107 @@
+-- Script entry point. Configure the global environment.
+EnvConfigure(_G);
+
+-- Initialize the systems to be used.
+Graphics.Setup(640, 480, 0, false);
+UI = UINew();
+
+-- Load the scripts.
+LoadRoutines{
+	-- Utilities --
+	"Cursor.txt",
+	"File.txt",
+	"Format.txt",
+	"Table.txt",
+
+	-- Classes --
+	"Collection.txt",
+	"Generic.txt",
+	"Method.txt",
+	"Picture.txt",
+	"Pump.txt",
+	"Section.txt",
+	"Text.txt",
+	"Timer.txt",
+	"Widget.txt",
+		"Checkbox.txt",
+		"EditboxBasic.txt",
+		"Grid.txt",
+		"Marquee.txt",
+		"Pane.txt",
+			"Backdrop.txt",
+			"Net.txt",
+			"Popup.txt",
+				"Title.txt",
+		"PushButton.txt",
+			"ScrollButton.txt",
+		"Radiobox.txt",
+		"ScrollBar.txt",
+		"Slider.txt",
+		"StaticText.txt",
+		"Textlist.txt",
+			"Combobox.txt",
+			"ListboxBasic.txt",
+
+	-- Game classes --
+	"Dynamics.txt",
+	"Object.txt",
+		"Ball.txt",
+		"Goal.txt",
+		"Steerable.txt",
+			"Player.txt",
+	"Team.txt",
+	"Wall.txt",
+	
+	-- Game routines --
+	"R_Ball.txt",
+	"R_Camera.txt",
+	"R_Game.txt",
+	"R_Player.txt",
+	"R_Team.txt",
+
+	-- Input --
+	"Input.txt",
+
+	-- Data --
+	"Data.txt",
+
+	-- Configuration --
+	"C_Teams.txt",
+
+	-- Screens --
+	"S_Home.txt",
+	"S_Test.txt",
+
+	-- Dialogs --
+	"D_Goals.txt",
+	"D_Level.txt",
+	"D_Player.txt",
+	"D_PlayerCollections.txt",
+	"D_TeamCollections.txt",
+	"D_Teams.txt",
+
+	-- 
+	function()
+		-- Override the resolution variables.
+		BindVariable("vw", function()
+			return (Graphics.GetVideoSize());
+		end, function() end);
+		BindVariable("vh", function()
+			local _, h = Graphics.GetVideoSize();
+			return h;
+		end, function() end);
+
+		-- Set the title string.
+		SDL.WM_SetCaption("AI Editor", "");
+
+		-- Begin on the home screen.
+		Screen("Home");
+	end,
+
+	-- Main loop --
+	"Main.txt"
+};
+
+-- Close the application.
+UI:Close();
+Graphics.Close();

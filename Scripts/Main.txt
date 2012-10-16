@@ -1,0 +1,22 @@
+-- Run the main loop.
+while not Quit do
+	-- Collect and process input.
+	UpdateInput();
+	
+	-- Clear the scene.
+	Graphics.Prepare();
+	
+	-- Update the scene and UI elements.
+	if Draw3D then
+		Graphics.Enter3D();
+		Draw3D();
+	end
+	Graphics.Enter2D();
+	UI:Update();
+	
+	-- Render the scene.
+	Graphics.Render();
+	
+	-- Give time to other threads.
+	Delay(1);
+end
